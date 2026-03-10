@@ -11,27 +11,8 @@
         body { font-family: 'Pretendard', sans-serif; background: #f1f5f9; color: #1e293b; margin: 0; padding: 20px; display: flex; justify-content: center; }
         .container { max-width: 500px; width: 100%; position: relative; }
         
+        /* 학교 이름 강조 */
         h1 { text-align: center; font-size: 1.4rem; color: #1e293b; margin-bottom: 15px; font-weight: 800; letter-spacing: -0.5px; }
-
-        /* 🚨 전체화면 팝업 알림창 */
-        #alertOverlay {
-            display: none; 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(239, 68, 68, 0.95);
-            color: white; z-index: 9999;
-            flex-direction: column; justify-content: center; align-items: center;
-            text-align: center; animation: fadeIn 0.3s;
-            cursor: pointer;
-        }
-        .alert-title { font-size: 1.4rem; font-weight: 900; margin-bottom: 15px; }
-        .alert-msg { font-size: 4.5rem; font-weight: 900; animation: bounce 0.6s infinite alternate; }
-        .alert-hint { margin-top: 30px; font-size: 1rem; opacity: 0.8; font-weight: 500; background: rgba(0,0,0,0.2); padding: 10px 20px; border-radius: 20px; }
-        
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes bounce { from { transform: scale(1); } to { transform: scale(1.05); } }
-
-        /* 🔔 알림 권한 켜기 버튼 */
-        .sound-btn { background: #10b981; color: white; border: none; padding: 12px; border-radius: 12px; font-weight: 700; width: 100%; margin-bottom: 15px; cursor: pointer; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); font-size: 1rem; }
 
         .notice-banner {
             display: none; 
@@ -56,6 +37,7 @@
 
         .card { background: white; border-radius: 20px; padding: 25px; margin-bottom: 20px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); border: 1px solid rgba(255,255,255,0.8); }
         
+        /* 공지사항 알림판 스타일 */
         .notice-card { background: #eff6ff; border: 1.5px solid #dbeafe; }
         .notice-title { font-size: 0.95rem; font-weight: 800; color: #1e40af; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
         .notice-content { font-size: 1.05rem; line-height: 1.5; color: #1e3a8a; font-weight: 600; word-break: break-all; }
@@ -75,18 +57,8 @@
 </head>
 <body>
 
-<div id="alertOverlay" onclick="closeAlert()">
-    <div class="alert-title">지금 즉시 급식실로 내려오세요!</div>
-    <div id="alertGrade" class="alert-msg">O학년</div>
-    <div class="alert-hint">터치하면 닫힙니다</div>
-</div>
-
 <div class="container">
-    <h1>🏫 무룡고등학교 스마트 급식실</h1>
-    
-    <button id="soundBtn" class="sound-btn" onclick="enableNotifications()">
-        🔔 알림 켜기
-    </button>
+    <h1>🏫 무룡고등학교 실시간 급식실</h1>
     
     <div id="noticeBanner" class="notice-banner">
         <span id="targetGrade">O학년</span> 학생들은<br>지금 즉시 급식실로 내려오세요!
@@ -119,47 +91,20 @@
     const SUPABASE_KEY = 'sb_publishable_LMeSKJzTDv8L-boma9QIFA_b8iJ89e9';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     
-    // ✨ "배식 전"이 맨 앞에 추가되었습니다. (총 5개)
+    // ✨ "배식 전"이 포함된 5단계 배열
     const grades = ["배식 전", "3학년", "2학년", "1학년", "배식 종료"];
-
     let currentIdx = -1;
-    let alertTimeout;
-    const dingDong = new Audio('https://notificationsounds.com/storage/sounds/file-sounds-1150-pristine.mp3');
 
-    function enableNotifications() {
-        dingDong.play().then(() => { dingDong.pause(); dingDong.currentTime = 0; }).catch(e => {});
-        if (navigator.vibrate) navigator.vibrate(200); 
-        alert("알림이 켜졌습니다! 화면을 켜두시면 순서가 바뀔 때 알림이 울립니다.");
-        document.getElementById('soundBtn').style.display = 'none'; 
-    }
-
-    function showAlert(grade) {
-        // ✨ "배식 전"과 "배식 종료"일 때는 팝업을 띄우지 않습니다.
-        if (grade === "배식 종료" || grade === "배식 전") return;
-        
-        document.getElementById('alertGrade').innerText = grade;
-        document.getElementById('alertOverlay').style.display = 'flex';
-        
-        dingDong.play().catch(e => console.log("터치 권한 필요"));
-        if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]); 
-
-        clearTimeout(alertTimeout);
-        alertTimeout = setTimeout(closeAlert, 15000);
-    }
-
-    function closeAlert() {
-        document.getElementById('alertOverlay').style.display = 'none';
-        dingDong.pause(); dingDong.currentTime = 0; 
-        if (navigator.vibrate) navigator.vibrate(0); 
-    }
-
+    // 데이터 초기 로드 (배식 상태 + 공지사항)
     async function loadData() {
+        // 배식 상태 로드
         const { data: statusData } = await supabaseClient.from('lunch_status').select('current_index').eq('id', 1).single();
         if (statusData) {
             currentIdx = statusData.current_index;
             updateUI(statusData.current_index);
         }
 
+        // 공지사항 로드
         const { data: noticeData } = await supabaseClient.from('announcements').select('content').eq('id', 1).single();
         if (noticeData) document.getElementById('realNotice').innerText = noticeData.content;
     }
@@ -169,10 +114,6 @@
         const banner = document.getElementById('noticeBanner');
         const targetGrade = document.getElementById('targetGrade');
         
-        // ✨ 배식 전(0)과 배식 종료(4)를 제외한 학년(1, 2, 3)일 때만 알림 발생
-        if (currentIdx !== -1 && currentIdx !== index && index > 0 && index < 4) {
-            showAlert(grades[index]);
-        }
         currentIdx = index;
         
         // ✨ 배식 전(0)이거나 배식 종료(4)일 때는 회색 처리 및 배너 숨김
@@ -190,8 +131,10 @@
         }
     }
 
+    // 실시간 감지 (배식 상태 + 공지사항 업데이트)
     supabaseClient.channel('custom-all-channel')
     .on('postgres_changes', { event: 'UPDATE', schema: 'public' }, payload => {
+        // 테이블 이름에 따라 다르게 처리
         if (payload.table === 'lunch_status') {
             updateUI(payload.new.current_index);
         }
