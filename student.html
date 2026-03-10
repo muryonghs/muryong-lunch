@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>무룡고등학교 실시간 급식실</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        
+        body { font-family: 'Pretendard', sans-serif; background: #f1f5f9; color: #1e293b; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { max-width: 500px; width: 100%; }
+        
+        /* 학교 이름 강조 */
+        h1 { text-align: center; font-size: 1.4rem; color: #1e293b; margin-bottom: 15px; font-weight: 800; letter-spacing: -0.5px; }
+
+        .notice-banner {
+            display: none; 
+            background: #ef4444;
+            color: white;
+            padding: 18px;
+            border-radius: 15px;
+            text-align: center;
+            font-size: 1.4rem;
+            font-weight: 800;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);
+            animation: pulse 1.5s infinite; 
+            word-break: keep-all;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); background: #dc2626; }
+            100% { transform: scale(1); }
+        }
+
+        .card { background: white; border-radius: 20px; padding: 25px; margin-bottom: 20px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); border: 1px solid rgba(255,255,255,0.8); }
+        
+        /* 공지사항 알림판 스타일 */
+        .notice-card { background: #eff6ff; border: 1.5px solid #dbeafe; }
+        .notice-title { font-size: 0.95rem; font-weight: 800; color: #1e40af; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+        .notice-content { font-size: 1.05rem; line-height: 1.5; color: #1e3a8a; font-weight: 600; word-break: break-all; }
+
+        .status-header { font-size: 0.95rem; color: #64748b; font-weight: 600; margin-bottom: 10px; display: block; text-align: center; }
+        .queue-status { font-size: 2.2rem; text-align: center; font-weight: 900; color: #3b82f6; margin-bottom: 5px; }
+        
+        .section-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; color: #334155; }
+        .menu-content { text-align: center; line-height: 1.8; font-size: 1.15rem; background: #f8fafc; padding: 20px; border-radius: 15px; border: 1px solid #f1f5f9; color: #334155; }
+        
+        .feedback-box { display: flex; flex-direction: column; gap: 12px; }
+        textarea { width: 100%; height: 90px; padding: 15px; border-radius: 12px; border: 1.5px solid #e2e8f0; font-family: inherit; resize: none; font-size: 1rem; box-sizing: border-box; }
+        textarea:focus { outline: none; border-color: #3b82f6; background: #fff; }
+        button { background: #1e293b; color: white; padding: 16px; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: 0.2s; }
+        button:active { transform: scale(0.98); }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🏫 무룡고등학교 스마트 급식실</h1>
+    
+    <div id="noticeBanner" class="notice-banner">
+        <span id="targetGrade">O학년</span> 학생들은<br>지금 즉시 급식실로 내려오세요!
+    </div>
+
+    <div class="card notice-card">
+        <div class="notice-title">📢 알림판</div>
+        <div id="realNotice" class="notice-content">공지사항을 불러오고 있습니다...</div>
+    </div>
+
+    <div class="card">
+        <span class="status-header">현재 배식 중인 학년</span>
+        <div class="queue-status" id="studentQueue">데이터 연결 중...</div>
+    </div>
+
+    <div class="card">
+        <div class="section-title">🍚 오늘의 메뉴</div>
+        <div class="menu-content" id="menuContent">급식 메뉴를 불러오고 있습니다...</div>
+    </div>
+
+    <div class="card feedback-box">
+        <div class="section-title">✍️ 급식실 건의사항</div>
+        <textarea id="feedbackText" placeholder="급식 메뉴나 급식실 이용에 관한 의견을 남겨주세요!"></textarea>
+        <button onclick="sendFeedback()">의견 보내기</button>
+    </div>
+</div>
+
+<script>
+    const SUPABASE_URL = 'https://aaszccrhporceolrnroz.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_LMeSKJzTDv8L-boma9QIFA_b8iJ89e9';
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const grades = ["3학년", "2학년", "1학년", "배식 종료"];
+
+    // 데이터 초기 로드 (배식 상태 + 공지사항)
+    async function loadData() {
+        // 배식 상태 로드
+        const { data: statusData } = await supabaseClient.from('lunch_status').select('current_index').eq('id', 1).single();
+        if (statusData) updateUI(statusData.current_index);
+
+        // 공지사항 로드
+        const { data: noticeData } = await supabaseClient.from('announcements').select('content').eq('id', 1).single();
+        if (noticeData) document.getElementById('realNotice').innerText = noticeData.content;
+    }
+
+    function updateUI(index) {
+        const statusBox = document.getElementById('studentQueue');
+        const banner = document.getElementById('noticeBanner');
+        const targetGrade = document.getElementById('targetGrade');
+        
+        if (index === 3) {
+            statusBox.innerText = "배식 종료";
+            statusBox.style.color = "#94a3b8";
+            banner.style.display = "none";
+        } else {
+            const currentGrade = grades[index];
+            statusBox.innerText = currentGrade;
+            statusBox.style.color = "#3b82f6";
+            
+            banner.style.display = "block";
+            targetGrade.innerText = currentGrade;
+        }
+    }
+
+    // 실시간 감지 (배식 상태 + 공지사항 업데이트)
+    supabaseClient.channel('custom-all-channel')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public' }, payload => {
+        // 테이블 이름에 따라 다르게 처리
+        if (payload.table === 'lunch_status') {
+            updateUI(payload.new.current_index);
+        }
+        if (payload.table === 'announcements') {
+            document.getElementById('realNotice').innerText = payload.new.content;
+        }
+    }).subscribe();
+
+    async function sendFeedback() {
+        const text = document.getElementById('feedbackText').value;
+        if (!text.trim()) return;
+        const { error } = await supabaseClient.from('feedback').insert([{ content: text }]);
+        if (!error) { 
+            alert("소중한 의견이 전송되었습니다!"); 
+            document.getElementById('feedbackText').value = ""; 
+        }
+    }
+
+    async function fetchMenu() {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const dateStr = `${year}${month}${day}`;
+
+        const url = `https://open.neis.go.kr/hub/mealServiceDietInfo?Type=json&ATPT_OFCDC_SC_CODE=H10&SD_SCHUL_CODE=7480070&MLSV_YMD=${dateStr}`;
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.mealServiceDietInfo) {
+                let menu = data.mealServiceDietInfo[1].row[0].DDISH_NM.replace(/[0-9.]/g, '').replace(/\(\)/g, '').replace(/<br\/>/g, '<br>');
+                document.getElementById('menuContent').innerHTML = menu;
+            } else {
+                document.getElementById('menuContent').innerText = "오늘은 급식 정보가 없습니다. 🏖️";
+            }
+        } catch(e) {
+            document.getElementById('menuContent').innerText = "메뉴 로드 실패 (네트워크 확인)";
+        }
+    }
+
+    loadData(); fetchMenu();
+</script>
+</body>
+</html>
