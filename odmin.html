@@ -56,7 +56,6 @@
     const SUPABASE_KEY = 'sb_publishable_LMeSKJzTDv8L-boma9QIFA_b8iJ89e9';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     
-    // ✨ "배식 전"이 포함된 5단계 배열로 변경
     const grades = ["배식 전", "3학년", "2학년", "1학년", "배식 종료"];
     let idx = 0;
 
@@ -70,21 +69,20 @@
         // 1. 배식 상태 로드
         const { data: s, error: se } = await supabaseClient.from('lunch_status').select('current_index').eq('id', 1).single();
         if (se) { logError("배식상태 로드실패: " + se.message); }
-        else if(s) { 
-            idx = s.current_index; 
-            updateColor(idx);
-        }
+        else if(s) { idx = s.current_index; updateColor(idx); }
 
         // 2. 공지사항 로드
         const { data: n, error: ne } = await supabaseClient.from('announcements').select('content').eq('id', 1).single();
         if (ne) { logError("공지사항 로드실패: " + ne.message); }
         else if(n) document.getElementById('noticeInput').value = n.content;
+
+        // ✨ 3. 기존 건의사항 불러오기 (새로 추가됨)
+        loadExistingFeedback();
     }
 
     function updateColor(currentIndex) {
         const gradeBox = document.getElementById('curGrade');
         gradeBox.innerText = grades[currentIndex];
-        // 배식 전(0)이나 배식 종료(4)일 때는 회색으로 표시
         if (currentIndex === 0 || currentIndex === 4) {
             gradeBox.style.color = "#94a3b8";
         } else {
@@ -93,10 +91,8 @@
     }
 
     async function updateIdx(type) {
-        // ✨ 배열 길이가 5개이므로 최댓값을 4로 변경
-        if(type === 'next' && idx < 4) {
-            idx++; 
-        } else if(type === 'reset') {
+        if(type === 'next' && idx < 4) { idx++; } 
+        else if(type === 'reset') {
             if(!confirm("순서를 초기화하여 '배식 전' 상태로 되돌리시겠습니까?")) return;
             idx = 0;
         }
@@ -113,7 +109,25 @@
         else alert("공지가 반영되었습니다!");
     }
 
-    // 실시간 건의사항 감지
+    // ✨ 기존 건의사항 불러오기 함수
+    async function loadExistingFeedback() {
+        // 가장 최근에 작성된 20개만 가져오기 (created_at 기준 내림차순 정렬 필요)
+        const { data, error } = await supabaseClient.from('feedback').select('content').limit(20);
+        
+        if (data && data.length > 0) {
+            const list = document.getElementById('fbList');
+            list.innerText = ""; // 초기화
+            // 최신 글이 위로 오도록 뒤집어서 출력 (서버 설정에 따라 다를 수 있음)
+            data.reverse().forEach(item => {
+                const div = document.createElement('div'); 
+                div.className = 'fb-item'; 
+                div.innerText = item.content;
+                list.prepend(div);
+            });
+        }
+    }
+
+    // 실시간 건의사항 감지 (새로 달리는 글)
     supabaseClient.channel('fb').on('postgres_changes', {event:'INSERT', schema:'public', table:'feedback'}, p => {
         const list = document.getElementById('fbList');
         if(list.innerText === "건의사항이 없습니다.") list.innerText = "";
