@@ -20,10 +20,23 @@
         .btn-next { background: #3b82f6; color: white; }
         .btn-reset { background: white; color: #94a3b8; border: 1px solid #e2e8f0; }
         .btn-save { background: #0f172a; color: white; margin-top: 10px; }
+        .btn-clear { background: #fee2e2; color: #ef4444; font-size: 0.9rem; padding: 10px; margin-top: 10px; } /* 초기화 버튼 */
         
         textarea { width: 100%; height: 80px; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0; font-family: inherit; resize: none; box-sizing: border-box; }
         .feedback-list { max-height: 200px; overflow-y: auto; background: #f1f5f9; padding: 10px; border-radius: 10px; }
         .fb-item { padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.9rem; }
+
+        /* 자동화 토글 스위치 디자인 */
+        .auto-box { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 12px 18px; border-radius: 12px; margin-bottom: 15px; }
+        .auto-label { font-size: 0.9rem; font-weight: 700; color: #475569; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #10b981; }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .info-footer { text-align: center; font-size: 0.75rem; color: #94a3b8; margin-top: 10px; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -33,7 +46,16 @@
     <div id="debugBox" class="debug-msg"></div>
 
     <div class="card">
-        <span class="label">배식 순서 제어</span>
+        <span class="label">시스템 자동화 설정</span>
+        <div class="auto-box">
+            <span class="auto-label">🕒 시간별 자동 호출/종료</span>
+            <label class="switch">
+                <input type="checkbox" id="autoToggle" onchange="toggleAutoMode()">
+                <span class="slider"></span>
+            </label>
+        </div>
+        
+        <span class="label">수동 순서 제어</span>
         <div class="status-val" id="curGrade">데이터 연결 중...</div>
         <button class="btn-next" onclick="updateIdx('next')">다음 학년/상태 호출</button>
         <button class="btn-reset" onclick="updateIdx('reset')">순서 초기화 (배식 전으로)</button>
@@ -48,6 +70,12 @@
     <div class="card">
         <span class="label">최근 건의사항</span>
         <div id="fbList" class="feedback-list">건의사항이 없습니다.</div>
+        <button class="btn-clear" onclick="clearFeedback()">🗑️ 건의사항 전체 삭제</button>
+    </div>
+
+    <div class="info-footer">
+        ※ 자동 모드 활성화 시: 12:30 [3학년 호출] | 13:30 [배식 종료]<br>
+        자동 모드는 관리자 페이지가 켜져 있는 동안에만 작동합니다.
     </div>
 </div>
 
@@ -58,76 +86,106 @@
     
     const grades = ["배식 전", "3학년", "2학년", "1학년", "배식 종료"];
     let idx = 0;
+    let isAutoMode = false;
 
-    function logError(msg) {
-        const box = document.getElementById('debugBox');
-        box.style.display = 'block';
-        box.innerHTML += `<div>⚠️ ${msg}</div>`;
-    }
-
+    // 초기화 및 데이터 로드
     async function init() {
-        // 1. 배식 상태 로드
-        const { data: s, error: se } = await supabaseClient.from('lunch_status').select('current_index').eq('id', 1).single();
-        if (se) { logError("배식상태 로드실패: " + se.message); }
-        else if(s) { idx = s.current_index; updateColor(idx); }
+        // 배식 상태 로드
+        const { data: s } = await supabaseClient.from('lunch_status').select('current_index').eq('id', 1).single();
+        if(s) { idx = s.current_index; updateColor(idx); }
 
-        // 2. 공지사항 로드
-        const { data: n, error: ne } = await supabaseClient.from('announcements').select('content').eq('id', 1).single();
-        if (ne) { logError("공지사항 로드실패: " + ne.message); }
-        else if(n) document.getElementById('noticeInput').value = n.content;
+        // 공지사항 로드
+        const { data: n } = await supabaseClient.from('announcements').select('content').eq('id', 1).single();
+        if(n) document.getElementById('noticeInput').value = n.content;
 
-        // ✨ 3. 기존 건의사항 불러오기 (새로 추가됨)
+        // 건의사항 로드
         loadExistingFeedback();
+
+        // 자동모드 설정 복구 (로컬 스토리지)
+        const savedAuto = localStorage.getItem('muryongAutoMode');
+        if(savedAuto === 'true') {
+            isAutoMode = true;
+            document.getElementById('autoToggle').checked = true;
+        }
     }
 
     function updateColor(currentIndex) {
         const gradeBox = document.getElementById('curGrade');
         gradeBox.innerText = grades[currentIndex];
-        if (currentIndex === 0 || currentIndex === 4) {
-            gradeBox.style.color = "#94a3b8";
-        } else {
-            gradeBox.style.color = "#3b82f6";
-        }
+        gradeBox.style.color = (currentIndex === 0 || currentIndex === 4) ? "#94a3b8" : "#3b82f6";
     }
 
-    async function updateIdx(type) {
-        if(type === 'next' && idx < 4) { idx++; } 
-        else if(type === 'reset') {
-            if(!confirm("순서를 초기화하여 '배식 전' 상태로 되돌리시겠습니까?")) return;
-            idx = 0;
+    async function updateIdx(type, autoIdx = null) {
+        if (autoIdx !== null) {
+            idx = autoIdx;
+        } else {
+            if(type === 'next' && idx < 4) idx++; 
+            else if(type === 'reset') {
+                if(!confirm("순서를 초기화하시겠습니까?")) return;
+                idx = 0;
+            }
         }
 
         const { error } = await supabaseClient.from('lunch_status').update({current_index: idx}).eq('id', 1);
-        if(error) alert("업데이트 실패: " + error.message);
-        else updateColor(idx);
+        if(!error) updateColor(idx);
     }
 
+    // 자동화 로직 (1분마다 체크)
+    function toggleAutoMode() {
+        isAutoMode = document.getElementById('autoToggle').checked;
+        localStorage.setItem('muryongAutoMode', isAutoMode);
+    }
+
+    setInterval(() => {
+        if (!isAutoMode) return;
+
+        const now = new Date();
+        const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+
+        if (timeStr === "12:30" && idx !== 1) {
+            console.log("자동화: 3학년 호출");
+            updateIdx(null, 1);
+        } else if (timeStr === "13:30" && idx !== 4) {
+            console.log("자동화: 배식 종료");
+            updateIdx(null, 4);
+        }
+    }, 30000); // 30초마다 체크
+
+    // 공지 수정
     async function saveNotice() {
         const val = document.getElementById('noticeInput').value;
         const { error } = await supabaseClient.from('announcements').update({content: val}).eq('id', 1);
-        if(error) alert("공지 저장 실패: " + error.message);
-        else alert("공지가 반영되었습니다!");
+        if(!error) alert("공지가 반영되었습니다!");
     }
 
-    // ✨ 기존 건의사항 불러오기 함수
-    async function loadExistingFeedback() {
-        // 가장 최근에 작성된 20개만 가져오기 (created_at 기준 내림차순 정렬 필요)
-        const { data, error } = await supabaseClient.from('feedback').select('content').limit(20);
+    // ✨ 건의사항 전체 삭제 (초기화)
+    async function clearFeedback() {
+        if(!confirm("모든 건의사항을 영구적으로 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) return;
         
+        // Supabase에서 모든 행 삭제 (id가 0보다 큰 모든 행)
+        const { error } = await supabaseClient.from('feedback').delete().neq('content', '');
+        
+        if(!error) {
+            alert("건의사항이 모두 삭제되었습니다.");
+            document.getElementById('fbList').innerHTML = "건의사항이 없습니다.";
+        } else {
+            alert("삭제 실패: " + error.message);
+        }
+    }
+
+    async function loadExistingFeedback() {
+        const { data } = await supabaseClient.from('feedback').select('content').order('id', { ascending: false }).limit(20);
         if (data && data.length > 0) {
             const list = document.getElementById('fbList');
-            list.innerText = ""; // 초기화
-            // 최신 글이 위로 오도록 뒤집어서 출력 (서버 설정에 따라 다를 수 있음)
-            data.reverse().forEach(item => {
-                const div = document.createElement('div'); 
-                div.className = 'fb-item'; 
-                div.innerText = item.content;
-                list.prepend(div);
+            list.innerText = "";
+            data.forEach(item => {
+                const div = document.createElement('div'); div.className = 'fb-item'; div.innerText = item.content;
+                list.appendChild(div);
             });
         }
     }
 
-    // 실시간 건의사항 감지 (새로 달리는 글)
+    // 실시간 감지
     supabaseClient.channel('fb').on('postgres_changes', {event:'INSERT', schema:'public', table:'feedback'}, p => {
         const list = document.getElementById('fbList');
         if(list.innerText === "건의사항이 없습니다.") list.innerText = "";
