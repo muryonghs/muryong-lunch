@@ -23,34 +23,14 @@
         textarea { width: 100%; height: 80px; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0; font-family: inherit; resize: none; box-sizing: border-box; }
         .feedback-list { max-height: 200px; overflow-y: auto; background: #f1f5f9; padding: 10px; border-radius: 10px; }
         .fb-item { padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.9rem; }
-
-        .auto-box { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 12px 18px; border-radius: 12px; margin-bottom: 15px; }
-        .auto-label { font-size: 0.9rem; font-weight: 700; color: #475569; }
-        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .4s; border-radius: 24px; }
-        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: #10b981; }
-        input:checked + .slider:before { transform: translateX(20px); }
-
-        .info-footer { text-align: center; font-size: 0.75rem; color: #94a3b8; margin-top: 10px; line-height: 1.5; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>🏫 무룡고등학교 급식 관리 센터</h1>
+    <h1>무룡고등학교 급식 관리 센터</h1>
 
     <div class="card">
-        <span class="label">시스템 자동화 설정</span>
-        <div class="auto-box">
-            <span class="auto-label">🕒 시간별 자동 상태 변경</span>
-            <label class="switch">
-                <input type="checkbox" id="autoToggle" onchange="toggleAutoMode()">
-                <span class="slider"></span>
-            </label>
-        </div>
-        
-        <span class="label">수동 순서 제어</span>
+        <span class="label">배식 순서 제어</span>
         <div class="status-val" id="curGrade">데이터 연결 중...</div>
         <button class="btn-next" onclick="updateIdx('next')">다음 학년/상태 호출</button>
         <button class="btn-reset" onclick="updateIdx('reset')">순서 초기화 (배식 전으로)</button>
@@ -65,12 +45,7 @@
     <div class="card">
         <span class="label">최근 건의사항</span>
         <div id="fbList" class="feedback-list">건의사항이 없습니다.</div>
-        <button class="btn-clear" onclick="clearFeedback()">🗑️ 건의사항 전체 삭제</button>
-    </div>
-
-    <div class="info-footer">
-        ※ 자동 모드: 08:00 [배식 전] | 12:30 [3학년 호출] | 13:30 [배식 종료]<br>
-        관리자 페이지 탭이 열려 있어야 자동화가 작동합니다.
+        <button class="btn-clear" onclick="clearFeedback()">🗑️ 건의사항 전체 삭제 (보안)</button>
     </div>
 </div>
 
@@ -81,7 +56,6 @@
     
     const grades = ["배식 전", "3학년", "2학년", "1학년", "배식 종료"];
     let idx = 0;
-    let isAutoMode = false;
 
     async function init() {
         const { data: s } = await supabaseClient.from('lunch_status').select('current_index').eq('id', 1).single();
@@ -91,12 +65,6 @@
         if(n) document.getElementById('noticeInput').value = n.content;
 
         loadExistingFeedback();
-
-        const savedAuto = localStorage.getItem('muryongAutoMode');
-        if(savedAuto === 'true') {
-            isAutoMode = true;
-            document.getElementById('autoToggle').checked = true;
-        }
     }
 
     function updateColor(currentIndex) {
@@ -105,40 +73,16 @@
         gradeBox.style.color = (currentIndex === 0 || currentIndex === 4) ? "#94a3b8" : "#3b82f6";
     }
 
-    async function updateIdx(type, autoIdx = null) {
-        if (autoIdx !== null) {
-            idx = autoIdx;
-        } else {
-            if(type === 'next' && idx < 4) idx++; 
-            else if(type === 'reset') {
-                if(!confirm("순서를 초기화하시겠습니까?")) return;
-                idx = 0;
-            }
+    async function updateIdx(type) {
+        if(type === 'next' && idx < 4) idx++; 
+        else if(type === 'reset') {
+            if(!confirm("순서를 초기화하시겠습니까?")) return;
+            idx = 0;
         }
+
         const { error } = await supabaseClient.from('lunch_status').update({current_index: idx}).eq('id', 1);
         if(!error) updateColor(idx);
     }
-
-    function toggleAutoMode() {
-        isAutoMode = document.getElementById('autoToggle').checked;
-        localStorage.setItem('muryongAutoMode', isAutoMode);
-    }
-
-    // ✨ 자동화 타이머 (8시 리셋 기능 추가)
-    setInterval(() => {
-        if (!isAutoMode) return;
-
-        const now = new Date();
-        const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-
-        if (timeStr === "08:00" && idx !== 0) {
-            updateIdx(null, 0); // 아침 8시 배식 전 리셋
-        } else if (timeStr === "12:30" && idx !== 1) {
-            updateIdx(null, 1); // 12시 30분 3학년 호출
-        } else if (timeStr === "13:30" && idx !== 4) {
-            updateIdx(null, 4); // 1시 30분 배식 종료
-        }
-    }, 30000); 
 
     async function saveNotice() {
         const val = document.getElementById('noticeInput').value;
@@ -146,12 +90,25 @@
         if(!error) alert("공지가 반영되었습니다!");
     }
 
+    // ✨ 건의사항 전체 삭제 (비밀번호 확인 기능 추가)
     async function clearFeedback() {
-        if(!confirm("모든 건의사항을 삭제하시겠습니까?")) return;
-        const { error } = await supabaseClient.from('feedback').delete().neq('content', '');
-        if(!error) {
-            alert("삭제되었습니다.");
-            document.getElementById('fbList').innerHTML = "건의사항이 없습니다.";
+        const password = prompt("건의사항을 삭제하려면 비밀번호를 입력하세요.");
+        
+        if (password === null) return; // 취소 버튼 클릭 시
+        
+        if (password === "mrhslh") {
+            if(!confirm("정말로 모든 건의사항을 영구 삭제하시겠습니까?")) return;
+            
+            const { error } = await supabaseClient.from('feedback').delete().neq('content', '');
+            
+            if(!error) {
+                alert("건의사항이 모두 초기화되었습니다.");
+                document.getElementById('fbList').innerHTML = "건의사항이 없습니다.";
+            } else {
+                alert("삭제 실패: " + error.message);
+            }
+        } else {
+            alert("비밀번호가 틀렸습니다.");
         }
     }
 
