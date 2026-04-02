@@ -14,19 +14,16 @@
         .label { font-size: 0.85rem; color: #64748b; font-weight: 700; margin-bottom: 10px; display: block; }
         .status-val { font-size: 1.8rem; font-weight: 900; color: #3b82f6; margin-bottom: 20px; text-align: center; }
         
-        .debug-msg { background: #fff1f2; color: #e11d48; padding: 10px; border-radius: 8px; font-size: 0.8rem; margin-bottom: 15px; display: none; border: 1px solid #fecdd3; }
-        
         button { width: 100%; padding: 16px; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: 0.2s; margin-bottom: 10px; }
         .btn-next { background: #3b82f6; color: white; }
         .btn-reset { background: white; color: #94a3b8; border: 1px solid #e2e8f0; }
         .btn-save { background: #0f172a; color: white; margin-top: 10px; }
-        .btn-clear { background: #fee2e2; color: #ef4444; font-size: 0.9rem; padding: 10px; margin-top: 10px; } /* 초기화 버튼 */
+        .btn-clear { background: #fee2e2; color: #ef4444; font-size: 0.9rem; padding: 10px; margin-top: 10px; }
         
         textarea { width: 100%; height: 80px; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0; font-family: inherit; resize: none; box-sizing: border-box; }
         .feedback-list { max-height: 200px; overflow-y: auto; background: #f1f5f9; padding: 10px; border-radius: 10px; }
         .fb-item { padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.9rem; }
 
-        /* 자동화 토글 스위치 디자인 */
         .auto-box { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 12px 18px; border-radius: 12px; margin-bottom: 15px; }
         .auto-label { font-size: 0.9rem; font-weight: 700; color: #475569; }
         .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
@@ -43,12 +40,10 @@
 <div class="container">
     <h1>🏫 무룡고등학교 급식 관리 센터</h1>
 
-    <div id="debugBox" class="debug-msg"></div>
-
     <div class="card">
         <span class="label">시스템 자동화 설정</span>
         <div class="auto-box">
-            <span class="auto-label">🕒 시간별 자동 호출/종료</span>
+            <span class="auto-label">🕒 시간별 자동 상태 변경</span>
             <label class="switch">
                 <input type="checkbox" id="autoToggle" onchange="toggleAutoMode()">
                 <span class="slider"></span>
@@ -74,8 +69,8 @@
     </div>
 
     <div class="info-footer">
-        ※ 자동 모드 활성화 시: 12:30 [3학년 호출] | 13:30 [배식 종료]<br>
-        자동 모드는 관리자 페이지가 켜져 있는 동안에만 작동합니다.
+        ※ 자동 모드: 08:00 [배식 전] | 12:30 [3학년 호출] | 13:30 [배식 종료]<br>
+        관리자 페이지 탭이 열려 있어야 자동화가 작동합니다.
     </div>
 </div>
 
@@ -88,20 +83,15 @@
     let idx = 0;
     let isAutoMode = false;
 
-    // 초기화 및 데이터 로드
     async function init() {
-        // 배식 상태 로드
         const { data: s } = await supabaseClient.from('lunch_status').select('current_index').eq('id', 1).single();
         if(s) { idx = s.current_index; updateColor(idx); }
 
-        // 공지사항 로드
         const { data: n } = await supabaseClient.from('announcements').select('content').eq('id', 1).single();
         if(n) document.getElementById('noticeInput').value = n.content;
 
-        // 건의사항 로드
         loadExistingFeedback();
 
-        // 자동모드 설정 복구 (로컬 스토리지)
         const savedAuto = localStorage.getItem('muryongAutoMode');
         if(savedAuto === 'true') {
             isAutoMode = true;
@@ -125,51 +115,43 @@
                 idx = 0;
             }
         }
-
         const { error } = await supabaseClient.from('lunch_status').update({current_index: idx}).eq('id', 1);
         if(!error) updateColor(idx);
     }
 
-    // 자동화 로직 (1분마다 체크)
     function toggleAutoMode() {
         isAutoMode = document.getElementById('autoToggle').checked;
         localStorage.setItem('muryongAutoMode', isAutoMode);
     }
 
+    // ✨ 자동화 타이머 (8시 리셋 기능 추가)
     setInterval(() => {
         if (!isAutoMode) return;
 
         const now = new Date();
         const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
 
-        if (timeStr === "12:30" && idx !== 1) {
-            console.log("자동화: 3학년 호출");
-            updateIdx(null, 1);
+        if (timeStr === "08:00" && idx !== 0) {
+            updateIdx(null, 0); // 아침 8시 배식 전 리셋
+        } else if (timeStr === "12:30" && idx !== 1) {
+            updateIdx(null, 1); // 12시 30분 3학년 호출
         } else if (timeStr === "13:30" && idx !== 4) {
-            console.log("자동화: 배식 종료");
-            updateIdx(null, 4);
+            updateIdx(null, 4); // 1시 30분 배식 종료
         }
-    }, 30000); // 30초마다 체크
+    }, 30000); 
 
-    // 공지 수정
     async function saveNotice() {
         const val = document.getElementById('noticeInput').value;
         const { error } = await supabaseClient.from('announcements').update({content: val}).eq('id', 1);
         if(!error) alert("공지가 반영되었습니다!");
     }
 
-    // ✨ 건의사항 전체 삭제 (초기화)
     async function clearFeedback() {
-        if(!confirm("모든 건의사항을 영구적으로 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) return;
-        
-        // Supabase에서 모든 행 삭제 (id가 0보다 큰 모든 행)
+        if(!confirm("모든 건의사항을 삭제하시겠습니까?")) return;
         const { error } = await supabaseClient.from('feedback').delete().neq('content', '');
-        
         if(!error) {
-            alert("건의사항이 모두 삭제되었습니다.");
+            alert("삭제되었습니다.");
             document.getElementById('fbList').innerHTML = "건의사항이 없습니다.";
-        } else {
-            alert("삭제 실패: " + error.message);
         }
     }
 
@@ -185,7 +167,6 @@
         }
     }
 
-    // 실시간 감지
     supabaseClient.channel('fb').on('postgres_changes', {event:'INSERT', schema:'public', table:'feedback'}, p => {
         const list = document.getElementById('fbList');
         if(list.innerText === "건의사항이 없습니다.") list.innerText = "";
