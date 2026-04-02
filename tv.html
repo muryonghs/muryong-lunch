@@ -27,10 +27,25 @@
         .info-title { font-size: 2.5rem; font-weight: 900; color: #0f172a; margin-bottom: 20px; border-bottom: 5px solid #3b82f6; display: inline-block; }
         .info-text { font-size: 2.4rem; line-height: 1.4; color: #334155; font-weight: 700; word-break: break-all;}
 
+        /* 학년 변경 긴급 알림 */
         #alertOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(239, 68, 68, 0.98); color: white; z-index: 1000; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
         .alert-title { font-size: 6rem; font-weight: 900; margin-bottom: 20px; }
         .alert-msg { font-size: 11rem; font-weight: 900; animation: bounce 0.6s infinite alternate; }
         @keyframes bounce { from { transform: scale(1); } to { transform: scale(1.1); } }
+
+        /* ✨ 15초마다 뜰 QR 코드 팝업 스타일 */
+        #qrPopup {
+            display: none;
+            position: fixed; bottom: 50px; left: 50px;
+            background: white; padding: 30px; border-radius: 30px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            border: 5px solid #3b82f6;
+            z-index: 500; animation: slideUp 0.5s ease-out;
+            flex-direction: column; align-items: center; text-align: center;
+        }
+        @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .qr-img { width: 250px; height: 250px; margin-bottom: 15px; }
+        .qr-text { font-size: 1.8rem; font-weight: 800; color: #1e293b; line-height: 1.3; }
 
         .controls { position: absolute; bottom: 30px; right: 30px; display: flex; gap: 15px; transition: opacity 0.5s; z-index: 100; opacity: 1; }
         .btn { padding: 15px 25px; border-radius: 15px; border: none; cursor: pointer; font-size: 1.2rem; font-weight: 600; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
@@ -43,6 +58,11 @@
 <div id="alertOverlay">
     <div class="alert-title">지금 즉시 급식실 입장하세요!</div>
     <div id="alertGrade" class="alert-msg">O학년</div>
+</div>
+
+<div id="qrPopup">
+    <img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://muryonghs.github.io/muryong-lunch/" class="qr-img" alt="QR Code">
+    <div class="qr-text">QR 코드를 스캔해<br>스마트폰으로 간단하게 이용해 보세요</div>
 </div>
 
 <header>
@@ -62,27 +82,42 @@
 </div>
 
 <div class="controls" id="controls">
-    <button class="btn btn-test" onclick="testSound()">🔊 소리 테스트</button>
-    <button class="btn btn-fs" id="fsBtn" onclick="toggleFullScreen()">🖥️ 전체화면 시작</button>
+    <button class="btn btn-test" onclick="testSound()">소리 테스트</button>
+    <button class="btn btn-fs" id="fsBtn" onclick="toggleFullScreen()">전체화면 시작</button>
 </div>
 
 <script>
     const SUPABASE_URL = 'https://aaszccrhporceolrnroz.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_LMeSKJzTDv8L-boma9QIFA_b8iJ89e9';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    
-    // ✨ "배식 전" 배열 추가
     const grades = ["배식 전", "3학년", "2학년", "1학년", "배식 종료"];
     
     const dingDong = new Audio('https://notificationsounds.com/storage/sounds/file-sounds-1150-pristine.mp3');
-    let timer;
+    let hideTimer;
     let currentIdx = -1;
 
     function resetTimer() {
         document.body.classList.remove('hide-all');
-        clearTimeout(timer);
-        timer = setTimeout(() => { document.body.classList.add('hide-all'); }, 3000);
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => { document.body.classList.add('hide-all'); }, 3000);
     }
+
+    /* ✨ QR 팝업 로직 추가 */
+    function showQrPopup() {
+        // 급식 학년 변경 알림이 뜨고 있을 때는 QR을 띄우지 않음
+        if (document.getElementById('alertOverlay').style.display === 'flex') return;
+
+        const qr = document.getElementById('qrPopup');
+        qr.style.display = 'flex';
+        
+        // 5초 후에 사라짐
+        setTimeout(() => {
+            qr.style.display = 'none';
+        }, 5000);
+    }
+
+    // 15초마다 팝업 실행 루프
+    setInterval(showQrPopup, 15000);
 
     function testSound() {
         dingDong.play().catch(e => console.log("잠금 해제 필요"));
@@ -93,15 +128,16 @@
         dingDong.play().then(() => { dingDong.pause(); dingDong.currentTime = 0; });
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen();
-            document.getElementById('fsBtn').innerText = "❌ 해제";
+            document.getElementById('fsBtn').innerText = "해제";
         } else {
             document.exitFullscreen();
-            document.getElementById('fsBtn').innerText = "🖥️ 전체화면 시작";
+            document.getElementById('fsBtn').innerText = "전체화면 시작";
         }
     }
 
     function showAlert(grade) {
         if (grade === "배식 종료" || grade === "배식 전") return;
+        document.getElementById('qrPopup').style.display = 'none'; // 알림 뜰 때 QR 끄기
         document.getElementById('alertGrade').innerText = grade;
         document.getElementById('alertOverlay').style.display = 'flex';
         dingDong.play().catch(e => {});
@@ -111,16 +147,9 @@
     function updateTVUI(idx) {
         const gradeBox = document.getElementById('tvGrade');
         const statusCard = document.getElementById('tvStatusCard');
-
-        // 알림창 조건: 배식전/배식종료 제외
-        if (currentIdx !== -1 && currentIdx !== idx && idx > 0 && idx < 4) { 
-            showAlert(grades[idx]); 
-        }
+        if (currentIdx !== -1 && currentIdx !== idx && idx > 0 && idx < 4) { showAlert(grades[idx]); }
         currentIdx = idx;
-        
         gradeBox.innerText = grades[idx];
-        
-        // 배식전/배식종료일 때 회색으로 차분하게
         if (idx === 0 || idx === 4) {
             gradeBox.style.color = "#94a3b8";
             statusCard.style.borderColor = "#cbd5e1";
@@ -134,16 +163,13 @@
         const today = new Date();
         const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
         const url = `https://open.neis.go.kr/hub/mealServiceDietInfo?Type=json&ATPT_OFCDC_SC_CODE=H10&SD_SCHUL_CODE=7480070&MLSV_YMD=${dateStr}`;
-        
         try {
             const res = await fetch(url);
             const data = await res.json();
             if (data.mealServiceDietInfo) {
                 let menu = data.mealServiceDietInfo[1].row[0].DDISH_NM.replace(/[0-9.]/g, '').replace(/\(\)/g, '').replace(/<br\/>/g, ', ');
                 document.getElementById('tvMenu').innerText = menu;
-            } else {
-                document.getElementById('tvMenu').innerText = "오늘은 급식 정보가 없습니다. 🏖️";
-            }
+            } else { document.getElementById('tvMenu').innerText = "오늘은 급식 정보가 없습니다. 🏖️"; }
         } catch (e) { document.getElementById('tvMenu').innerText = "식단 정보를 불러오지 못했습니다."; }
     }
 
