@@ -30,19 +30,19 @@
         .status-header { font-size: 0.95rem; color: #64748b; font-weight: 600; margin-bottom: 10px; display: block; text-align: center; }
         .queue-status { font-size: 2.2rem; text-align: center; font-weight: 900; color: #3b82f6; margin-bottom: 5px; }
         
-        /* ✨ 세련된 타이머 박스 디자인 */
+        /* ✨ 차분하고 세련된 블루/그레이 타이머 디자인 */
         .wait-box { 
             display: none; 
             margin-top: 20px; 
-            background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+            background: #f8fafc;
             border-radius: 16px;
-            padding: 15px 20px;
+            padding: 18px 20px;
             text-align: center;
-            border: 1px solid #fecdd3;
+            border: 1px solid #e2e8f0;
         }
-        .wait-time-text { font-size: 1.4rem; font-weight: 900; color: #e11d48; margin-bottom: 6px; letter-spacing: -0.5px; }
-        .wait-time-text span { font-variant-numeric: tabular-nums; } /* 숫자 폭 고정 */
-        .wait-notice { font-size: 0.75rem; color: #fb7185; font-weight: 600; line-height: 1.4; word-break: keep-all; }
+        .wait-time-text { font-size: 1.3rem; font-weight: 800; color: #2563eb; margin-bottom: 8px; letter-spacing: -0.5px; }
+        .wait-time-text span { font-variant-numeric: tabular-nums; font-size: 1.6rem; font-weight: 900; } 
+        .wait-notice { font-size: 0.8rem; color: #64748b; font-weight: 600; line-height: 1.4; word-break: keep-all; }
 
         .section-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; color: #334155; }
         .menu-content { text-align: center; line-height: 1.8; font-size: 1.15rem; background: #f8fafc; padding: 20px; border-radius: 15px; border: 1px solid #f1f5f9; color: #334155; }
@@ -79,8 +79,8 @@
         <div class="queue-status" id="studentQueue">데이터 연결 중...</div>
         
         <div id="waitTimeBox" class="wait-box">
-            <div class="wait-time-text">⏳ 남은 예상 시간 <span id="displayTime">00:00</span></div>
-            <div class="wait-notice">※ 안내된 시간은 예상치이며 실제 호출 시간은 다를 수 있습니다.</div>
+            <div class="wait-time-text">⏳ 다음 호출 예상시간 <span id="displayTime">00:00</span></div>
+            <div class="wait-notice">※ 안내된 시간은 실제 호출 시간과 다를 수 있습니다.</div>
         </div>
     </div>
 
