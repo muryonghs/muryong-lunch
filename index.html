@@ -218,7 +218,8 @@
             const res = await fetch(`https://open.neis.go.kr/hub/mealServiceDietInfo?Type=json&ATPT_OFCDC_SC_CODE=H10&SD_SCHUL_CODE=7480070&MLSV_YMD=${d}`);
             const data = await res.json();
             if (data.mealServiceDietInfo) {
-                let m = data.mealServiceDietInfo[1].row[0].DDISH_NM.replace(/[0-9.]/g, '').replace(/\(\)/g, '<br>').replace(/<br\/>/g, '<br>');
+                // ✨ 띄어쓰기(줄바꿈) 오류 수정 완료!
+                let m = data.mealServiceDietInfo[1].row[0].DDISH_NM.replace(/[0-9.]/g, '').replace(/\(\)/g, '').replace(/<br\/>/g, '<br>');
                 document.getElementById('menuContent').innerHTML = m;
             } else { document.getElementById('menuContent').innerText = "오늘은 급식 정보가 없습니다."; }
         } catch(e) { document.getElementById('menuContent').innerText = "메뉴 로드 실패"; }
