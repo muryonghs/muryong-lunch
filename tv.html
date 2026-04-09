@@ -77,7 +77,7 @@
         <div class="status-label">현재 배식 상태</div>
         <div class="current-grade" id="tvGrade">연결 중</div>
         <div id="waitTimeBox" class="wait-box">
-            <div class="wait-time-text">⏳ 다음 호출 예상시간 <span id="displayTime">00:00</span></div>
+            <div class="wait-time-text">다음 호출 예상시간 <span id="displayTime">00:00</span></div>
             <div class="wait-notice">※ 위 시간은 예상치이며 실제 호출 시간은 다를 수 있습니다.</div>
         </div>
     </div>
@@ -123,10 +123,10 @@
         dingDong.play().then(() => { dingDong.pause(); dingDong.currentTime = 0; });
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen();
-            document.getElementById('fsBtn').innerText = "❌ 해제";
+            document.getElementById('fsBtn').innerText = "해제";
         } else {
             document.exitFullscreen();
-            document.getElementById('fsBtn').innerText = "🖥️ 전체화면 시작";
+            document.getElementById('fsBtn').innerText = "전체화면 시작";
         }
     }
 
