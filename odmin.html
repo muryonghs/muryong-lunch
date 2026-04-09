@@ -33,7 +33,7 @@
 </head>
 <body>
 <div class="container">
-    <h1>🏫 무룡고등학교 급식 관리 센터</h1>
+    <h1>무룡고등학교 급식 관리 센터</h1>
 
     <div class="card">
         <span class="label">배식 순서 제어</span>
@@ -60,8 +60,8 @@
             <button class="btn-reset" style="margin:0; color:#1e293b;" onclick="addWait(10)">+10분</button>
         </div>
         <div style="display: flex; gap: 10px;">
-            <button class="btn-reset" style="margin:0; flex: 1;" onclick="resetWait()">0분 (끄기)</button>
-            <button class="btn-save" style="margin:0; flex: 1;" onclick="sendWaitTime()">타이머 전송 (추가)</button>
+            <button class="btn-reset" style="margin:0; flex: 1;" onclick="resetWait()">0분</button>
+            <button class="btn-save" style="margin:0; flex: 1;" onclick="sendWaitTime()">타이머 전송</button>
         </div>
     </div>
 
@@ -74,7 +74,7 @@
     <div class="card">
         <span class="label">최근 건의사항</span>
         <div id="fbList" class="feedback-list">건의사항이 없습니다.</div>
-        <button class="btn-clear" onclick="clearFeedback()">🗑️ 건의사항 전체 삭제 (보안)</button>
+        <button class="btn-clear" onclick="clearFeedback()">건의사항 초기화</button>
     </div>
 </div>
 
