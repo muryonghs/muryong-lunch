@@ -30,10 +30,19 @@
         .status-header { font-size: 0.95rem; color: #64748b; font-weight: 600; margin-bottom: 10px; display: block; text-align: center; }
         .queue-status { font-size: 2.2rem; text-align: center; font-weight: 900; color: #3b82f6; margin-bottom: 5px; }
         
-        /* ✨ 대기 시간 UI 스타일 */
-        .wait-box { display: none; margin-top: 15px; padding-top: 15px; border-top: 1px dashed #e2e8f0; text-align: center; }
-        .wait-time-text { font-size: 1.3rem; font-weight: 800; color: #e11d48; margin-bottom: 5px; }
-        .wait-notice { font-size: 0.75rem; color: #94a3b8; line-height: 1.4; word-break: keep-all; }
+        /* ✨ 세련된 타이머 박스 디자인 */
+        .wait-box { 
+            display: none; 
+            margin-top: 20px; 
+            background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+            border-radius: 16px;
+            padding: 15px 20px;
+            text-align: center;
+            border: 1px solid #fecdd3;
+        }
+        .wait-time-text { font-size: 1.4rem; font-weight: 900; color: #e11d48; margin-bottom: 6px; letter-spacing: -0.5px; }
+        .wait-time-text span { font-variant-numeric: tabular-nums; } /* 숫자 폭 고정 */
+        .wait-notice { font-size: 0.75rem; color: #fb7185; font-weight: 600; line-height: 1.4; word-break: keep-all; }
 
         .section-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; color: #334155; }
         .menu-content { text-align: center; line-height: 1.8; font-size: 1.15rem; background: #f8fafc; padding: 20px; border-radius: 15px; border: 1px solid #f1f5f9; color: #334155; }
@@ -70,8 +79,8 @@
         <div class="queue-status" id="studentQueue">데이터 연결 중...</div>
         
         <div id="waitTimeBox" class="wait-box">
-            <div class="wait-time-text">⏳ 예상 대기 시간: <span id="displayTime">00:00</span></div>
-            <div class="wait-notice">※ 안내된 대기 시간은 예상치이며, 실제 배식 상황에 따라 호출 시간이 다를 수 있습니다.</div>
+            <div class="wait-time-text">⏳ 남은 예상 시간 <span id="displayTime">00:00</span></div>
+            <div class="wait-notice">※ 안내된 시간은 예상치이며 실제 호출 시간은 다를 수 있습니다.</div>
         </div>
     </div>
 
@@ -95,7 +104,7 @@
     const grades = ["배식 전", "3학년", "2학년", "1학년", "배식 종료"];
     let currentIdx = -1;
     let alertTimeout;
-    let waitInterval = null; // 대기시간 타이머
+    let waitInterval = null;
 
     function showAlert(grade) {
         if (grade === "배식 종료" || grade === "배식 전") return;
@@ -107,30 +116,26 @@
 
     function closeAlert() { document.getElementById('alertOverlay').style.display = 'none'; }
 
-    // ✨ 실시간 대기시간 카운트다운 함수
     function updateWaitTimeUI(waitMin, setAtStr) {
         const waitBox = document.getElementById('waitTimeBox');
         if (waitInterval) clearInterval(waitInterval);
 
-        // 시간이 0이거나 설정되지 않았으면 숨김
         if (!waitMin || waitMin <= 0 || !setAtStr) {
             waitBox.style.display = 'none';
             return;
         }
 
         const setAt = new Date(setAtStr);
-
         waitInterval = setInterval(() => {
             const now = new Date();
             const diffSec = Math.floor((now - setAt) / 1000);
             const remainingSec = (waitMin * 60) - diffSec;
 
-            // 시간이 다 지나면 숨김
             if (remainingSec <= 0) {
                 waitBox.style.display = 'none';
                 clearInterval(waitInterval);
             } else {
-                waitBox.style.display = 'block'; // 보이게 활성화
+                waitBox.style.display = 'block';
                 const m = Math.floor(remainingSec / 60);
                 const s = remainingSec % 60;
                 document.getElementById('displayTime').innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
@@ -173,7 +178,7 @@
     supabaseClient.channel('custom-all-channel').on('postgres_changes', { event: 'UPDATE', schema: 'public' }, payload => {
         if (payload.table === 'lunch_status') {
             updateUI(payload.new.current_index);
-            updateWaitTimeUI(payload.new.wait_minutes, payload.new.wait_set_at); // 실시간 갱신
+            updateWaitTimeUI(payload.new.wait_minutes, payload.new.wait_set_at);
         }
         if (payload.table === 'announcements') document.getElementById('realNotice').innerText = payload.new.content;
     }).subscribe();
