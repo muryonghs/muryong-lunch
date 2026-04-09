@@ -22,10 +22,20 @@
         .status-label { font-size: 4rem; color: #64748b; font-weight: 700; margin-bottom: 20px; }
         .current-grade { font-size: 15rem; font-weight: 900; color: #1d4ed8; line-height: 1; text-align: center; word-break: keep-all; margin-bottom: 20px; }
 
-        /* ✨ TV 대기 시간 UI */
-        .wait-box { display: none; margin-top: 20px; padding-top: 30px; border-top: 3px dashed #e2e8f0; text-align: center; width: 100%; }
-        .wait-time-text { font-size: 4rem; font-weight: 900; color: #e11d48; margin-bottom: 10px; }
-        .wait-notice { font-size: 1.8rem; color: #94a3b8; font-weight: 600; }
+        /* ✨ TV용 세련된 대기 시간 박스 */
+        .wait-box { 
+            display: none; 
+            margin-top: 30px; 
+            background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+            border-radius: 30px;
+            padding: 25px 40px;
+            text-align: center;
+            border: 2px solid #fecdd3;
+            width: 100%;
+        }
+        .wait-time-text { font-size: 4.5rem; font-weight: 900; color: #e11d48; letter-spacing: -2px; margin-bottom: 5px; }
+        .wait-time-text span { font-variant-numeric: tabular-nums; }
+        .wait-notice { font-size: 1.5rem; color: #fb7185; font-weight: 700; }
 
         .side-content { display: flex; flex-direction: column; gap: 30px; }
         .info-box { background: white; border-radius: 40px; padding: 40px; flex: 1; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
@@ -67,8 +77,8 @@
         <div class="status-label">현재 배식 상태</div>
         <div class="current-grade" id="tvGrade">연결 중</div>
         <div id="waitTimeBox" class="wait-box">
-            <div class="wait-time-text">⏳ 예상 대기 시간 <span id="displayTime">00:00</span></div>
-            <div class="wait-notice">※ 안내된 시간은 실제 호출 시간과 다를 수 있습니다.</div>
+            <div class="wait-time-text">⏳ 예상 남은 시간 <span id="displayTime">00:00</span></div>
+            <div class="wait-notice">※ 위 시간은 실제 호출 시간과 다를 수 있습니다.</div>
         </div>
     </div>
     <div class="side-content">
@@ -129,7 +139,6 @@
         setTimeout(() => { document.getElementById('alertOverlay').style.display = 'none'; }, 60000);
     }
 
-    // ✨ 실시간 대기시간 카운트다운
     function updateWaitTimeUI(waitMin, setAtStr) {
         const waitBox = document.getElementById('waitTimeBox');
         if (waitInterval) clearInterval(waitInterval);
@@ -140,7 +149,6 @@
         }
 
         const setAt = new Date(setAtStr);
-
         waitInterval = setInterval(() => {
             const now = new Date();
             const diffSec = Math.floor((now - setAt) / 1000);
@@ -188,7 +196,7 @@
             if (data.mealServiceDietInfo) {
                 let m = data.mealServiceDietInfo[1].row[0].DDISH_NM.replace(/[0-9.]/g, '').replace(/\(\)/g, '').replace(/<br\/>/g, ', ');
                 document.getElementById('tvMenu').innerText = m;
-            } else { document.getElementById('tvMenu').innerText = "오늘은 급식 정보가 없습니다. 🏖️"; }
+            } else { document.getElementById('tvMenu').innerText = "오늘은 급식 정보가 없습니다."; }
         } catch (e) { document.getElementById('tvMenu').innerText = "식단 정보를 불러오지 못했습니다."; }
     }
 
