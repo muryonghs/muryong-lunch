@@ -11,10 +11,9 @@
         body { font-family: 'Pretendard', sans-serif; background: #f1f5f9; color: #1e293b; margin: 0; padding: 20px; display: flex; justify-content: center; }
         .container { max-width: 500px; width: 100%; position: relative; }
         
-        /* 헤더 스타일 단순화 */
         h1 { text-align: center; font-size: 1.4rem; color: #1e293b; margin-bottom: 20px; font-weight: 800; letter-spacing: -0.5px; }
         
-        /* ✨ 엄청 눈에 띄는 소리 켜기 버튼 */
+        /* 큼직한 알림 켜기 버튼 */
         .sound-btn-large {
             display: flex; justify-content: center; align-items: center; gap: 8px;
             width: 100%; background: #10b981; color: white; border: none; 
@@ -115,12 +114,10 @@
 
     const dingDong = new Audio('https://notificationsounds.com/storage/sounds/file-sounds-1150-pristine.mp3');
 
-    // ✨ 소리 버튼 누르면 권한 얻고 싹 사라짐!
     function enableSound() {
         dingDong.play().then(() => {
             dingDong.pause(); 
             dingDong.currentTime = 0;
-            // 버튼 숨기기
             document.getElementById('soundBtn').style.display = 'none';
             alert("알림이 켜졌습니다! 순서가 되면 소리와 화면으로 알려드립니다.");
         }).catch(e => {
@@ -224,7 +221,8 @@
             const res = await fetch(`https://open.neis.go.kr/hub/mealServiceDietInfo?Type=json&ATPT_OFCDC_SC_CODE=H10&SD_SCHUL_CODE=7480070&MLSV_YMD=${d}`);
             const data = await res.json();
             if (data.mealServiceDietInfo) {
-                let m = data.mealServiceDietInfo[1].row[0].DDISH_NM.replace(/[0-9.]/g, '').replace(/\(\)/g, '<br>').replace(/<br\/>/g, '<br>');
+                // ✨ 띄어쓰기 오류 수정한 부분입니다! (\(\) 제거)
+                let m = data.mealServiceDietInfo[1].row[0].DDISH_NM.replace(/[0-9.]/g, '').replace(/\(\)/g, '').replace(/<br\/>/g, '<br>');
                 document.getElementById('menuContent').innerHTML = m;
             } else { document.getElementById('menuContent').innerText = "오늘은 급식 정보가 없습니다."; }
         } catch(e) { document.getElementById('menuContent').innerText = "메뉴 로드 실패"; }
