@@ -12,16 +12,7 @@
         .container { max-width: 500px; width: 100%; position: relative; }
         h1 { text-align: center; font-size: 1.4rem; color: #1e293b; margin-bottom: 15px; font-weight: 800; letter-spacing: -0.5px; }
 
-        /* ✨ 조용한 전체화면 팝업 알림창 복구 */
-        #alertOverlay {
-            display: none; 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(239, 68, 68, 0.95);
-            color: white; z-index: 9999;
-            flex-direction: column; justify-content: center; align-items: center;
-            text-align: center; animation: fadeIn 0.3s;
-            cursor: pointer;
-        }
+        #alertOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(239, 68, 68, 0.95); color: white; z-index: 9999; flex-direction: column; justify-content: center; align-items: center; text-align: center; animation: fadeIn 0.3s; cursor: pointer; }
         .alert-title { font-size: 1.4rem; font-weight: 900; margin-bottom: 15px; }
         .alert-msg { font-size: 4.5rem; font-weight: 900; animation: bounce 0.6s infinite alternate; }
         .alert-hint { margin-top: 30px; font-size: 1rem; opacity: 0.8; font-weight: 500; background: rgba(0,0,0,0.2); padding: 10px 20px; border-radius: 20px; }
@@ -38,6 +29,12 @@
         .notice-content { font-size: 1.05rem; line-height: 1.5; color: #1e3a8a; font-weight: 600; word-break: break-all; }
         .status-header { font-size: 0.95rem; color: #64748b; font-weight: 600; margin-bottom: 10px; display: block; text-align: center; }
         .queue-status { font-size: 2.2rem; text-align: center; font-weight: 900; color: #3b82f6; margin-bottom: 5px; }
+        
+        /* ✨ 대기 시간 UI 스타일 */
+        .wait-box { display: none; margin-top: 15px; padding-top: 15px; border-top: 1px dashed #e2e8f0; text-align: center; }
+        .wait-time-text { font-size: 1.3rem; font-weight: 800; color: #e11d48; margin-bottom: 5px; }
+        .wait-notice { font-size: 0.75rem; color: #94a3b8; line-height: 1.4; word-break: keep-all; }
+
         .section-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; color: #334155; }
         .menu-content { text-align: center; line-height: 1.8; font-size: 1.15rem; background: #f8fafc; padding: 20px; border-radius: 15px; border: 1px solid #f1f5f9; color: #334155; }
         
@@ -57,7 +54,7 @@
 </div>
 
 <div class="container">
-    <h1>무룡고등학교 실시간 급식실</h1>
+    <h1>🏫 무룡고등학교 스마트 급식실</h1>
     
     <div id="noticeBanner" class="notice-banner">
         <span id="targetGrade">O학년</span> 학생들은<br>지금 즉시 급식실로 내려오세요!
@@ -71,6 +68,11 @@
     <div class="card">
         <span class="status-header">현재 배식 중인 학년</span>
         <div class="queue-status" id="studentQueue">데이터 연결 중...</div>
+        
+        <div id="waitTimeBox" class="wait-box">
+            <div class="wait-time-text">⏳ 예상 대기 시간: <span id="displayTime">00:00</span></div>
+            <div class="wait-notice">※ 안내된 대기 시간은 예상치이며, 실제 배식 상황에 따라 호출 시간이 다를 수 있습니다.</div>
+        </div>
     </div>
 
     <div class="card">
@@ -93,26 +95,55 @@
     const grades = ["배식 전", "3학년", "2학년", "1학년", "배식 종료"];
     let currentIdx = -1;
     let alertTimeout;
+    let waitInterval = null; // 대기시간 타이머
 
-    // ✨ 조용한 팝업 함수
     function showAlert(grade) {
         if (grade === "배식 종료" || grade === "배식 전") return;
         document.getElementById('alertGrade').innerText = grade;
         document.getElementById('alertOverlay').style.display = 'flex';
-        
         clearTimeout(alertTimeout);
-        alertTimeout = setTimeout(closeAlert, 15000); // 15초 뒤 자동 닫힘
+        alertTimeout = setTimeout(closeAlert, 15000);
     }
 
-    function closeAlert() {
-        document.getElementById('alertOverlay').style.display = 'none';
+    function closeAlert() { document.getElementById('alertOverlay').style.display = 'none'; }
+
+    // ✨ 실시간 대기시간 카운트다운 함수
+    function updateWaitTimeUI(waitMin, setAtStr) {
+        const waitBox = document.getElementById('waitTimeBox');
+        if (waitInterval) clearInterval(waitInterval);
+
+        // 시간이 0이거나 설정되지 않았으면 숨김
+        if (!waitMin || waitMin <= 0 || !setAtStr) {
+            waitBox.style.display = 'none';
+            return;
+        }
+
+        const setAt = new Date(setAtStr);
+
+        waitInterval = setInterval(() => {
+            const now = new Date();
+            const diffSec = Math.floor((now - setAt) / 1000);
+            const remainingSec = (waitMin * 60) - diffSec;
+
+            // 시간이 다 지나면 숨김
+            if (remainingSec <= 0) {
+                waitBox.style.display = 'none';
+                clearInterval(waitInterval);
+            } else {
+                waitBox.style.display = 'block'; // 보이게 활성화
+                const m = Math.floor(remainingSec / 60);
+                const s = remainingSec % 60;
+                document.getElementById('displayTime').innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            }
+        }, 1000);
     }
 
     async function loadData() {
-        const { data: statusData } = await supabaseClient.from('lunch_status').select('current_index').eq('id', 1).single();
+        const { data: statusData } = await supabaseClient.from('lunch_status').select('current_index, wait_minutes, wait_set_at').eq('id', 1).single();
         if (statusData) {
             currentIdx = statusData.current_index;
             updateUI(statusData.current_index);
+            updateWaitTimeUI(statusData.wait_minutes, statusData.wait_set_at);
         }
         const { data: noticeData } = await supabaseClient.from('announcements').select('content').eq('id', 1).single();
         if (noticeData) document.getElementById('realNotice').innerText = noticeData.content;
@@ -123,10 +154,7 @@
         const banner = document.getElementById('noticeBanner');
         const targetGrade = document.getElementById('targetGrade');
         
-        // ✨ 순서가 변경되면 팝업 띄우기
-        if (currentIdx !== -1 && currentIdx !== index && index > 0 && index < 4) {
-            showAlert(grades[index]);
-        }
+        if (currentIdx !== -1 && currentIdx !== index && index > 0 && index < 4) { showAlert(grades[index]); }
         currentIdx = index;
         
         if (index === 0 || index === 4) {
@@ -143,7 +171,10 @@
     }
 
     supabaseClient.channel('custom-all-channel').on('postgres_changes', { event: 'UPDATE', schema: 'public' }, payload => {
-        if (payload.table === 'lunch_status') updateUI(payload.new.current_index);
+        if (payload.table === 'lunch_status') {
+            updateUI(payload.new.current_index);
+            updateWaitTimeUI(payload.new.wait_minutes, payload.new.wait_set_at); // 실시간 갱신
+        }
         if (payload.table === 'announcements') document.getElementById('realNotice').innerText = payload.new.content;
     }).subscribe();
 
@@ -151,25 +182,19 @@
         const text = document.getElementById('feedbackText').value;
         if (!text.trim()) return;
         const { error } = await supabaseClient.from('feedback').insert([{ content: text }]);
-        if (!error) { 
-            alert("소중한 의견이 전송되었습니다!"); 
-            document.getElementById('feedbackText').value = ""; 
-        } else {
-            alert("의견 전송에 실패했습니다.");
-        }
+        if (!error) { alert("소중한 의견이 전송되었습니다!"); document.getElementById('feedbackText').value = ""; }
     }
 
     async function fetchMenu() {
-        const today = new Date();
-        const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-        const url = `https://open.neis.go.kr/hub/mealServiceDietInfo?Type=json&ATPT_OFCDC_SC_CODE=H10&SD_SCHUL_CODE=7480070&MLSV_YMD=${dateStr}`;
+        const d = new Date().toISOString().slice(0,10).replace(/-/g, '');
         try {
-            const res = await fetch(url); const data = await res.json();
+            const res = await fetch(`https://open.neis.go.kr/hub/mealServiceDietInfo?Type=json&ATPT_OFCDC_SC_CODE=H10&SD_SCHUL_CODE=7480070&MLSV_YMD=${d}`);
+            const data = await res.json();
             if (data.mealServiceDietInfo) {
-                let menu = data.mealServiceDietInfo[1].row[0].DDISH_NM.replace(/[0-9.]/g, '').replace(/\(\)/g, '').replace(/<br\/>/g, '<br>');
-                document.getElementById('menuContent').innerHTML = menu;
-            } else { document.getElementById('menuContent').innerText = "오늘은 급식 정보가 없습니다. 🏖️"; }
-        } catch(e) { document.getElementById('menuContent').innerText = "메뉴 로드 실패 (네트워크 확인)"; }
+                let m = data.mealServiceDietInfo[1].row[0].DDISH_NM.replace(/[0-9.]/g, '').replace(/\(\)/g, '').replace(/<br\/>/g, '<br>');
+                document.getElementById('menuContent').innerHTML = m;
+            } else { document.getElementById('menuContent').innerText = "오늘은 급식 정보가 없습니다."; }
+        } catch(e) { document.getElementById('menuContent').innerText = "메뉴 로드 실패"; }
     }
 
     loadData(); fetchMenu();
