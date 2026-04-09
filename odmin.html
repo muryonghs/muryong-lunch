@@ -23,6 +23,12 @@
         textarea { width: 100%; height: 80px; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0; font-family: inherit; resize: none; box-sizing: border-box; }
         .feedback-list { max-height: 200px; overflow-y: auto; background: #f1f5f9; padding: 10px; border-radius: 10px; }
         .fb-item { padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.9rem; }
+
+        /* ✨ 새롭게 디자인된 대기 시간 설정 디스플레이 */
+        .wait-display-box { background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 16px; padding: 20px; text-align: center; margin-bottom: 15px; }
+        .wait-display-box .title { font-size: 0.9rem; color: #64748b; font-weight: 700; margin-bottom: 5px; display: block; }
+        .wait-display-box .number { font-size: 3rem; font-weight: 900; color: #e11d48; line-height: 1; }
+        .wait-display-box .unit { font-size: 1.2rem; font-weight: 700; color: #e11d48; }
     </style>
 </head>
 <body>
@@ -35,8 +41,13 @@
         <button class="btn-next" onclick="updateIdx('next')">다음 학년/상태 호출</button>
         <button class="btn-reset" onclick="updateIdx('reset')">순서 초기화 (배식 전으로)</button>
 
-        <hr style="border:0; border-top:1px dashed #e2e8f0; margin: 20px 0;">
-        <span class="label">예상 대기 시간 설정 (설정값: <span id="tempWaitDisplay" style="color:#e11d48; font-weight:900;">0</span>분)</span>
+        <hr style="border:0; border-top:1px solid #e2e8f0; margin: 25px 0;">
+        
+        <div class="wait-display-box">
+            <span class="title">설정된 예상 대기 시간</span>
+            <div><span id="tempWaitDisplay" class="number">0</span> <span class="unit">분</span></div>
+        </div>
+
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px;">
             <button class="btn-reset" style="margin:0; color:#1e293b;" onclick="addWait(1)">+1분</button>
             <button class="btn-reset" style="margin:0; color:#1e293b;" onclick="addWait(5)">+5분</button>
@@ -44,10 +55,7 @@
         </div>
         <div style="display: flex; gap: 10px;">
             <button class="btn-reset" style="margin:0; flex: 1;" onclick="resetWait()">0분 초기화</button>
-            <button class="btn-save" style="margin:0; flex: 1;" onclick="sendWaitTime()">전송하기</button>
-        </div>
-        <div style="font-size:0.75rem; color:#94a3b8; text-align:center; margin-top:8px;">
-            ※ 0분으로 전송 시 학생/TV 화면에서 안내 문구가 완전히 숨겨집니다.
+            <button class="btn-save" style="margin:0; flex: 1;" onclick="sendWaitTime()">타이머 켜기</button>
         </div>
     </div>
 
@@ -71,8 +79,6 @@
     
     const grades = ["배식 전", "3학년", "2학년", "1학년", "배식 종료"];
     let idx = 0;
-    
-    // ✨ 대기 시간 제어 변수
     let tempWaitTime = 0;
 
     async function init() {
@@ -98,11 +104,16 @@
             idx = 0;
         }
 
-        const { error } = await supabaseClient.from('lunch_status').update({current_index: idx}).eq('id', 1);
-        if(!error) updateColor(idx);
+        // ✨ 핵심 로직: 상태가 변할 때(호출 시) 대기 시간을 0으로 강제 초기화하여 화면에서 지움
+        const { error } = await supabaseClient.from('lunch_status')
+            .update({ current_index: idx, wait_minutes: 0 }).eq('id', 1);
+            
+        if(!error) {
+            updateColor(idx);
+            resetWait(); // 관리자 화면 디스플레이도 0으로 초기화
+        }
     }
 
-    // ✨ 대기 시간 제어 함수
     function addWait(min) {
         tempWaitTime += min;
         document.getElementById('tempWaitDisplay').innerText = tempWaitTime;
@@ -114,7 +125,6 @@
     }
 
     async function sendWaitTime() {
-        // 관리자가 설정한 시간과 그 시점(timestamp)을 동시에 DB에 전송
         const { error } = await supabaseClient.from('lunch_status')
             .update({
                 wait_minutes: tempWaitTime,
@@ -122,8 +132,8 @@
             }).eq('id', 1);
 
         if(!error) {
-            if(tempWaitTime === 0) alert("0분으로 설정되었습니다.\n(학생/TV 화면에서 예상 대기 시간이 숨겨집니다)");
-            else alert(`${tempWaitTime}분 대기 시간이 학생들과 TV로 전송되었습니다!`);
+            if(tempWaitTime === 0) alert("타이머가 화면에서 숨겨졌습니다.");
+            else alert(`${tempWaitTime}분 대기 타이머가 시작되었습니다!`);
         } else {
             alert("전송 실패: " + error.message);
         }
@@ -137,21 +147,14 @@
 
     async function clearFeedback() {
         const password = prompt("건의사항을 삭제하려면 비밀번호를 입력하세요.");
-        
-        if (password === null) return;
-        
         if (password === "mrhslh") {
-            if(!confirm("정말로 모든 건의사항을 영구 삭제하시겠습니까?")) return;
-            
+            if(!confirm("정말로 삭제하시겠습니까?")) return;
             const { error } = await supabaseClient.from('feedback').delete().neq('content', '');
-            
             if(!error) {
-                alert("건의사항이 모두 초기화되었습니다.");
+                alert("초기화되었습니다.");
                 document.getElementById('fbList').innerHTML = "건의사항이 없습니다.";
-            } else {
-                alert("삭제 실패: " + error.message);
             }
-        } else {
+        } else if (password !== null) {
             alert("비밀번호가 틀렸습니다.");
         }
     }
