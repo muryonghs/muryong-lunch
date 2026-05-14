@@ -40,17 +40,16 @@
 <body>
 <div class="container">
     <div class="header-wrap">
-        <h1>무룡고등학교 급식 관리 센터</h1>
-        <button class="btn-refresh" onclick="location.reload()">전체 새로고침</button>
+        <h1>🏫 급식 관리 센터</h1>
+        <button class="btn-refresh" onclick="location.reload()">🔄 전체 새로고침</button>
     </div>
 
-    <!-- 순서 제어 카드 -->
     <div class="card">
         <span class="label">배식 순서 제어</span>
         <div class="status-val" id="curGrade">데이터 연결 중...</div>
         <button class="btn-next" onclick="updateIdx('next')">다음 학년/상태 호출</button>
         <button class="btn-reset" onclick="updateIdx('reset')">순서 초기화 (배식 전으로)</button>
-        <!-- ✨ 운영 안함 버튼 추가 -->
+        <!-- ✨ 운영 안함 버튼 -->
         <button class="btn-reset" onclick="updateIdx('close')" style="color:#ef4444; border-color:#fecdd3; background:#fff1f2;">🚫 오늘 급식 운영 안함</button>
 
         <hr style="border:0; border-top:1px dashed #cbd5e1; margin: 25px 0;">
@@ -71,23 +70,23 @@
         </div>
         <div style="display: flex; gap: 10px;">
             <button class="btn-reset" style="margin:0; flex: 1;" onclick="resetWait()">0분 (끄기)</button>
-            <button class="btn-save" style="margin:0; flex: 1;" onclick="sendWaitTime()">타이머 전송 (추가)</button>
+            <button class="btn-save" style="margin:0; flex: 1;" onclick="sendWaitTime()">타이머 전송</button>
         </div>
     </div>
 
-    <!-- ✨ 긴급 중요 팝업 카드 -->
+    <!-- ✨ 깜빡이는 중요 팝업 제어 -->
     <div class="card">
-        <span class="label" style="color:#e11d48;">🚨 중요 공지사항 팝업 (전체화면 강제 표시)</span>
-        <textarea id="popupInput" placeholder="긴급하게 알릴 중요 내용을 입력하세요. (비워두고 내리기 누르면 사라집니다)"></textarea>
+        <span class="label" style="color:#e11d48;">🚨 중요 공지사항 팝업 (깜빡임 효과)</span>
+        <textarea id="popupInput" placeholder="긴급하게 알릴 내용을 적어주세요. (비우고 '내리기' 누르면 사라집니다)"></textarea>
         <div style="display:flex; gap:10px; margin-top:10px;">
             <button class="btn-reset" onclick="sendPopup('')" style="flex:1; color:#ef4444; border-color:#fecdd3; background:#fff1f2;">팝업 내리기</button>
             <button class="btn-save" onclick="sendPopup(document.getElementById('popupInput').value)" style="flex:1; background:#e11d48;">팝업 띄우기</button>
         </div>
     </div>
 
-    <!-- ✨ TV 화면 설정 카드 -->
+    <!-- ✨ TV 화면 크기 조절 -->
     <div class="card">
-        <span class="label">TV 현황판 설정</span>
+        <span class="label">📺 TV 현황판 설정</span>
         <div style="display:flex; justify-content:space-between; align-items:center; background:#f1f5f9; padding:15px 20px; border-radius:12px; border:1px solid #e2e8f0;">
             <span style="font-weight:700; color:#475569;">화면 글자 크기</span>
             <div style="display:flex; align-items:center; gap:15px;">
@@ -107,7 +106,7 @@
     <div class="card">
         <span class="label">최근 건의사항</span>
         <div id="fbList" class="feedback-list">건의사항이 없습니다.</div>
-        <button class="btn-clear" onclick="clearFeedback()">건의사항 전체 삭제</button>
+        <button class="btn-clear" onclick="clearFeedback()">🗑️ 건의사항 전체 삭제 (보안)</button>
     </div>
 </div>
 
@@ -116,10 +115,8 @@
     const SUPABASE_KEY = 'sb_publishable_LMeSKJzTDv8L-boma9QIFA_b8iJ89e9';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     
-    // ✨ 운영 안함 추가
     const grades = ["배식 전", "3학년", "2학년", "1학년", "배식 종료", "운영 안함"];
     let idx = 0;
-    
     let tempWaitTime = 0;
     let adminWaitInterval = null;
     let liveWaitMin = 0;
@@ -130,25 +127,24 @@
         const { data: s } = await supabaseClient.from('lunch_status').select('current_index, wait_minutes, wait_set_at').eq('id', 1).single();
         if(s) { 
             idx = s.current_index; 
+            
+            // ✨ 12시 이후 자동 리셋
+            const now = new Date();
+            if (now.getHours() >= 12) {
+                const todayStr = now.toLocaleDateString('ko-KR');
+                const savedDate = localStorage.getItem('muryong_last_reset');
+                if (savedDate !== todayStr && idx !== 0 && idx !== 5) {
+                    idx = 0;
+                    await supabaseClient.from('lunch_status').update({ current_index: 0, wait_minutes: 0 }).eq('id', 1);
+                    localStorage.setItem('muryong_last_reset', todayStr);
+                    alert("낮 12시가 지나 배식 상태가 '배식 전'으로 자동 초기화 되었습니다.");
+                }
+            }
+            
             updateColor(idx); 
             updateWaitTimeUI(s.wait_minutes, s.wait_set_at);
-
-            // ✨ 12시 이후 접속 시 자동 초기화 로직
-            const now = new Date();
-            const todayStr = now.toLocaleDateString('ko-KR');
-            const savedDate = localStorage.getItem('muryong_last_reset');
-
-            if (now.getHours() >= 12 && savedDate !== todayStr && idx !== 0 && idx !== 5) {
-                idx = 0;
-                await supabaseClient.from('lunch_status').update({ current_index: 0, wait_minutes: 0 }).eq('id', 1);
-                localStorage.setItem('muryong_last_reset', todayStr);
-                alert("낮 12시가 넘어 배식 상태가 '배식 전'으로 자동 초기화되었습니다.");
-                updateColor(0);
-                resetWait();
-            }
         }
 
-        // 공지, 팝업, TV 설정 불러오기
         const { data: nList } = await supabaseClient.from('announcements').select('*');
         if(nList) {
             nList.forEach(n => {
@@ -160,14 +156,12 @@
                 }
             });
         }
-
         loadExistingFeedback();
     }
 
     function updateColor(currentIndex) {
         const gradeBox = document.getElementById('curGrade');
         gradeBox.innerText = grades[currentIndex];
-        // 5(운영 안함) 이면 빨간색, 배식 전/종료면 회색
         if (currentIndex === 5) gradeBox.style.color = "#ef4444";
         else if (currentIndex === 0 || currentIndex === 4) gradeBox.style.color = "#94a3b8";
         else gradeBox.style.color = "#3b82f6";
@@ -186,7 +180,6 @@
 
         display.style.color = "#2563eb"; display.style.fontSize = "3.5rem";
         const setAt = new Date(liveSetAt);
-
         adminWaitInterval = setInterval(() => {
             const now = new Date();
             const diffSec = Math.floor((now - setAt) / 1000);
@@ -204,17 +197,10 @@
 
     async function updateIdx(type) {
         if(type === 'next' && idx < 4) idx++; 
-        else if(type === 'reset') {
-            if(!confirm("순서를 초기화하시겠습니까?")) return;
-            idx = 0;
-        } else if (type === 'close') {
-            if(!confirm("오늘 급식을 '운영 안함' 상태로 바꾸시겠습니까?")) return;
-            idx = 5;
-        }
+        else if(type === 'reset') { if(!confirm("순서를 초기화하시겠습니까?")) return; idx = 0; } 
+        else if (type === 'close') { if(!confirm("오늘 급식을 '운영 안함'으로 표시하시겠습니까?")) return; idx = 5; }
 
-        const { error } = await supabaseClient.from('lunch_status')
-            .update({ current_index: idx, wait_minutes: 0 }).eq('id', 1);
-            
+        const { error } = await supabaseClient.from('lunch_status').update({ current_index: idx, wait_minutes: 0 }).eq('id', 1);
         if(!error) { updateColor(idx); resetWait(); }
     }
 
@@ -227,13 +213,11 @@
             if(!error) { alert("타이머가 화면에서 숨겨졌습니다."); resetWait(); }
             return;
         }
-
         let remainingSec = 0;
         if (liveSetAt && liveWaitMin > 0) {
             const diffSec = Math.floor((new Date() - new Date(liveSetAt)) / 1000);
             remainingSec = (liveWaitMin * 60) - diffSec;
         }
-
         if (remainingSec > 0) {
             const { error } = await supabaseClient.from('lunch_status').update({ wait_minutes: liveWaitMin + tempWaitTime }).eq('id', 1);
             if(!error) { alert(`진행 중인 타이머에 ${tempWaitTime}분이 추가되었습니다!`); resetWait(); }
@@ -249,16 +233,14 @@
         if(!error) alert("알림판이 반영되었습니다!");
     }
 
-    // ✨ 중요 팝업 전송 (id=2)
     async function sendPopup(val) {
         const { error } = await supabaseClient.from('announcements').upsert({id: 2, content: val});
         if(!error) {
-            if(val === '') alert("모든 화면에서 팝업이 내려갔습니다.");
-            else alert("학생과 TV 화면에 팝업이 즉시 띄워졌습니다!");
+            if(val === '') alert("팝업이 해제되었습니다.");
+            else alert("학생과 TV 화면에 깜빡이는 팝업이 띄워졌습니다!");
         }
     }
 
-    // ✨ TV 스케일 변경 (id=3)
     async function changeTvScale(diff) {
         tvScale += diff;
         if(tvScale < 50) tvScale = 50;
