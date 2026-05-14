@@ -22,14 +22,15 @@
         .alert-hint { margin-top: 30px; font-size: 1rem; opacity: 0.8; font-weight: 500; background: rgba(0,0,0,0.2); padding: 10px 20px; border-radius: 20px; }
         
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
         @keyframes bounce { from { transform: scale(1); } to { transform: scale(1.05); } }
 
-        /* ✨ 차분해진 중요 팝업 (깜빡임 제거) */
+        /* ✨ 5초마다 나타났다 사라질 중요 팝업 */
         #importantPopup { 
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(15, 23, 42, 0.9); z-index: 10000; justify-content: center; align-items: center; 
             padding: 20px; box-sizing: border-box; 
-            animation: fadeIn 0.3s ease-out; 
+            opacity: 0; transition: opacity 0.5s ease-in-out; /* 부드러운 전환 효과 */
         }
         .important-content { background: white; width: 100%; max-width: 350px; padding: 30px 20px; border-radius: 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
         .important-content h2 { margin: 0 0 15px 0; color: #e11d48; font-size: 1.3rem; font-weight: 900; }
@@ -94,7 +95,6 @@
         <span class="status-header">현재 배식 중인 학년</span>
         <div class="queue-status" id="studentQueue">데이터 연결 중...</div>
         
-        <!-- ✨ 미운영 시 안내 텍스트 -->
         <div id="subStatus" style="font-size: 0.9rem; color: #ef4444; font-weight: 700; text-align: center; margin-top: -5px; margin-bottom: 15px; display: none;">오늘은 급식 호출을 진행하지 않습니다</div>
 
         <div id="waitTimeBox" class="wait-box">
@@ -124,6 +124,9 @@
     let currentIdx = -1;
     let alertTimeout;
     let waitInterval = null;
+    let popupInterval = null; // ✨ 팝업 반복 제어
+    let isPopupVisible = false; // ✨ 팝업 상태 확인
+    let currentPopupText = "";
 
     const dingDong = new Audio('https://notificationsounds.com/storage/sounds/file-sounds-1150-pristine.mp3');
 
@@ -153,14 +156,49 @@
         dingDong.pause(); dingDong.currentTime = 0;
     }
 
-    function handlePopup(text) {
+    // ✨ 5초마다 팝업을 보였다 숨겼다 하는 함수
+    function togglePopupDisplay() {
         const popup = document.getElementById('importantPopup');
+        // 긴급 학년 호출 알림이 떠있으면 중요 팝업은 띄우지 않음
+        if (document.getElementById('alertOverlay').style.display === 'flex') {
+            popup.style.opacity = '0';
+            setTimeout(() => { popup.style.display = 'none'; }, 500);
+            isPopupVisible = false;
+            return;
+        }
+
+        if (isPopupVisible) {
+            // 숨기기
+            popup.style.opacity = '0';
+            setTimeout(() => { popup.style.display = 'none'; }, 500); // 애니메이션 시간 대기 후 숨김
+            isPopupVisible = false;
+        } else {
+            // 보이기
+            popup.style.display = 'flex';
+            // 아주 약간의 딜레이 후 투명도 변경 (애니메이션 적용을 위함)
+            setTimeout(() => { popup.style.opacity = '1'; }, 10);
+            isPopupVisible = true;
+        }
+    }
+
+    // ✨ 팝업 데이터 처리 (서버에서 데이터가 오면 실행)
+    function handlePopup(text) {
+        currentPopupText = text;
         const textDiv = document.getElementById('importantPopupText');
+        
+        if (popupInterval) clearInterval(popupInterval); // 기존 반복 중지
+        
         if (text && text.trim() !== '') {
             textDiv.innerText = text;
-            popup.style.display = 'flex';
+            isPopupVisible = false; // 초기화
+            togglePopupDisplay(); // 즉시 한 번 띄움
+            popupInterval = setInterval(togglePopupDisplay, 5000); // 5초마다 반복 실행
         } else {
-            popup.style.display = 'none';
+            // 팝업 내용이 없으면 완전히 숨김 및 중지
+            const popup = document.getElementById('importantPopup');
+            popup.style.opacity = '0';
+            setTimeout(() => { popup.style.display = 'none'; }, 500);
+            isPopupVisible = false;
         }
     }
 
@@ -214,10 +252,10 @@
         if (index === 5) {
             statusBox.innerText = grades[index];
             statusBox.style.color = "#ef4444"; 
-            subStatus.style.display = "block"; // 미운영 안내 문구 표시
+            subStatus.style.display = "block";
             banner.style.display = "none";
         } else {
-            subStatus.style.display = "none"; // 문구 숨김
+            subStatus.style.display = "none";
             if (index === 0 || index === 4) {
                 statusBox.innerText = grades[index];
                 statusBox.style.color = "#94a3b8";
