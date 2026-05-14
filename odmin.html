@@ -3,18 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>무룡고 급식 관리자</title>
+    <title>무룡고등학교 실시간 급식실</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         body { font-family: 'Pretendard', sans-serif; background: #f8fafc; color: #1e293b; margin: 0; padding: 20px; display: flex; justify-content: center; }
         .container { max-width: 500px; width: 100%; }
         
-        /* 헤더 (새로고침 버튼 포함) */
-        .header-wrap { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-        h1 { font-size: 1.4rem; color: #0f172a; margin: 0; font-weight: 800; }
-        .btn-refresh { background: #e2e8f0; color: #475569; border: none; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: 0.2s; }
-        .btn-refresh:active { background: #cbd5e1; }
+        h1 { font-size: 1.4rem; color: #0f172a; text-align: center; margin-bottom: 25px; font-weight: 800; }
 
         .card { background: white; border-radius: 20px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
         .label { font-size: 0.85rem; color: #64748b; font-weight: 700; margin-bottom: 10px; display: block; }
@@ -39,18 +35,17 @@
 </head>
 <body>
 <div class="container">
-    <div class="header-wrap">
-        <h1>🏫 급식 관리 센터</h1>
-        <button class="btn-refresh" onclick="location.reload()">🔄 전체 새로고침</button>
-    </div>
+    <h1>무룡고등학교 실시간 급식실</h1>
 
     <div class="card">
         <span class="label">배식 순서 제어</span>
         <div class="status-val" id="curGrade">데이터 연결 중...</div>
+        <!-- ✨ 미운영 시 나타날 안내 문구 -->
+        <div id="subStatus" style="font-size:0.9rem; color:#ef4444; margin-top:-15px; margin-bottom:15px; font-weight:700; display:none; text-align:center;">오늘은 급식 호출을 진행하지 않습니다</div>
+
         <button class="btn-next" onclick="updateIdx('next')">다음 학년/상태 호출</button>
         <button class="btn-reset" onclick="updateIdx('reset')">순서 초기화 (배식 전으로)</button>
-        <!-- ✨ 운영 안함 버튼 -->
-        <button class="btn-reset" onclick="updateIdx('close')" style="color:#ef4444; border-color:#fecdd3; background:#fff1f2;">🚫 오늘 급식 운영 안함</button>
+        <button class="btn-reset" onclick="updateIdx('close')" style="color:#ef4444; border-color:#fecdd3; background:#fff1f2;">🚫 미운영 설정</button>
 
         <hr style="border:0; border-top:1px dashed #cbd5e1; margin: 25px 0;">
         
@@ -74,9 +69,8 @@
         </div>
     </div>
 
-    <!-- ✨ 깜빡이는 중요 팝업 제어 -->
     <div class="card">
-        <span class="label" style="color:#e11d48;">🚨 중요 공지사항 팝업 (깜빡임 효과)</span>
+        <span class="label" style="color:#e11d48;">🚨 중요 공지사항 팝업 (TV/학생 화면)</span>
         <textarea id="popupInput" placeholder="긴급하게 알릴 내용을 적어주세요. (비우고 '내리기' 누르면 사라집니다)"></textarea>
         <div style="display:flex; gap:10px; margin-top:10px;">
             <button class="btn-reset" onclick="sendPopup('')" style="flex:1; color:#ef4444; border-color:#fecdd3; background:#fff1f2;">팝업 내리기</button>
@@ -84,7 +78,6 @@
         </div>
     </div>
 
-    <!-- ✨ TV 화면 크기 조절 -->
     <div class="card">
         <span class="label">📺 TV 현황판 설정</span>
         <div style="display:flex; justify-content:space-between; align-items:center; background:#f1f5f9; padding:15px 20px; border-radius:12px; border:1px solid #e2e8f0;">
@@ -115,7 +108,8 @@
     const SUPABASE_KEY = 'sb_publishable_LMeSKJzTDv8L-boma9QIFA_b8iJ89e9';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     
-    const grades = ["배식 전", "3학년", "2학년", "1학년", "배식 종료", "운영 안함"];
+    // ✨ 미운영 변경
+    const grades = ["배식 전", "3학년", "2학년", "1학년", "배식 종료", "미운영"];
     let idx = 0;
     let tempWaitTime = 0;
     let adminWaitInterval = null;
@@ -128,7 +122,7 @@
         if(s) { 
             idx = s.current_index; 
             
-            // ✨ 12시 이후 자동 리셋
+            // 12시 이후 자동 리셋
             const now = new Date();
             if (now.getHours() >= 12) {
                 const todayStr = now.toLocaleDateString('ko-KR');
@@ -161,10 +155,17 @@
 
     function updateColor(currentIndex) {
         const gradeBox = document.getElementById('curGrade');
+        const subStatus = document.getElementById('subStatus');
         gradeBox.innerText = grades[currentIndex];
-        if (currentIndex === 5) gradeBox.style.color = "#ef4444";
-        else if (currentIndex === 0 || currentIndex === 4) gradeBox.style.color = "#94a3b8";
-        else gradeBox.style.color = "#3b82f6";
+        
+        if (currentIndex === 5) {
+            gradeBox.style.color = "#ef4444";
+            subStatus.style.display = "block";
+        } else {
+            subStatus.style.display = "none";
+            if (currentIndex === 0 || currentIndex === 4) gradeBox.style.color = "#94a3b8";
+            else gradeBox.style.color = "#3b82f6";
+        }
     }
 
     function updateWaitTimeUI(waitMin, setAtStr) {
@@ -198,7 +199,7 @@
     async function updateIdx(type) {
         if(type === 'next' && idx < 4) idx++; 
         else if(type === 'reset') { if(!confirm("순서를 초기화하시겠습니까?")) return; idx = 0; } 
-        else if (type === 'close') { if(!confirm("오늘 급식을 '운영 안함'으로 표시하시겠습니까?")) return; idx = 5; }
+        else if (type === 'close') { if(!confirm("오늘 급식을 '미운영'으로 설정하시겠습니까?")) return; idx = 5; }
 
         const { error } = await supabaseClient.from('lunch_status').update({ current_index: idx, wait_minutes: 0 }).eq('id', 1);
         if(!error) { updateColor(idx); resetWait(); }
@@ -237,7 +238,7 @@
         const { error } = await supabaseClient.from('announcements').upsert({id: 2, content: val});
         if(!error) {
             if(val === '') alert("팝업이 해제되었습니다.");
-            else alert("학생과 TV 화면에 깜빡이는 팝업이 띄워졌습니다!");
+            else alert("학생과 TV 화면에 팝업이 띄워졌습니다!");
         }
     }
 
@@ -284,6 +285,9 @@
         updateWaitTimeUI(p.new.wait_minutes, p.new.wait_set_at);
     }).subscribe();
 
+    // ✨ 30분(1800000ms)마다 백그라운드 자동 새로고침 (연결 끊김 방지)
+    setInterval(() => { location.reload(); }, 1800000);
+    
     init();
 </script>
 </body>
