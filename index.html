@@ -11,7 +11,6 @@
         body { font-family: 'Pretendard', sans-serif; background: #f1f5f9; color: #1e293b; margin: 0; padding: 20px; display: flex; justify-content: center; }
         .container { max-width: 500px; width: 100%; position: relative; }
         
-        /* 헤더 & 소리 권한 버튼 레이아웃 */
         .header-wrap { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         h1 { font-size: 1.3rem; color: #1e293b; font-weight: 800; letter-spacing: -0.5px; margin: 0; }
         .sound-btn { background: #e2e8f0; color: #475569; border: none; padding: 6px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: 0.2s; }
@@ -25,16 +24,12 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes bounce { from { transform: scale(1); } to { transform: scale(1.05); } }
 
-        /* ✨ 사라졌다 생겼다 깜빡이는 중요 팝업 */
+        /* ✨ 차분해진 중요 팝업 (깜빡임 제거) */
         #importantPopup { 
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(15, 23, 42, 0.9); z-index: 10000; justify-content: center; align-items: center; 
             padding: 20px; box-sizing: border-box; 
-            animation: blinkPopup 1.5s infinite; /* 깜빡임 애니메이션 */
-        }
-        @keyframes blinkPopup {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.2; } /* 0.2로 자연스럽게 밝아졌다 어두워짐 */
+            animation: fadeIn 0.3s ease-out; 
         }
         .important-content { background: white; width: 100%; max-width: 350px; padding: 30px 20px; border-radius: 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
         .important-content h2 { margin: 0 0 15px 0; color: #e11d48; font-size: 1.3rem; font-weight: 900; }
@@ -73,7 +68,6 @@
     <div class="alert-hint">터치하면 닫힙니다</div>
 </div>
 
-<!-- ✨ 중요 팝업 HTML -->
 <div id="importantPopup">
     <div class="important-content">
         <h2>🚨 중요 공지사항</h2>
@@ -83,7 +77,7 @@
 
 <div class="container">
     <div class="header-wrap">
-        <h1>🏫 스마트 급식실</h1>
+        <h1>무룡고등학교 실시간 급식실</h1>
         <button id="soundBtn" class="sound-btn" onclick="enableSound()">🔈 소리 켜기</button>
     </div>
     
@@ -100,6 +94,9 @@
         <span class="status-header">현재 배식 중인 학년</span>
         <div class="queue-status" id="studentQueue">데이터 연결 중...</div>
         
+        <!-- ✨ 미운영 시 안내 텍스트 -->
+        <div id="subStatus" style="font-size: 0.9rem; color: #ef4444; font-weight: 700; text-align: center; margin-top: -5px; margin-bottom: 15px; display: none;">오늘은 급식 호출을 진행하지 않습니다</div>
+
         <div id="waitTimeBox" class="wait-box">
             <div class="wait-time-text">다음 호출 예상시간 <span id="displayTime">00:00</span></div>
             <div class="wait-notice">※ 안내된 시간은 실제 호출 시간과 다를 수 있습니다.</div>
@@ -123,8 +120,7 @@
     const SUPABASE_KEY = 'sb_publishable_LMeSKJzTDv8L-boma9QIFA_b8iJ89e9';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     
-    // ✨ 운영 안함 상태 추가
-    const grades = ["배식 전", "3학년", "2학년", "1학년", "배식 종료", "운영 안함"];
+    const grades = ["배식 전", "3학년", "2학년", "1학년", "배식 종료", "미운영"];
     let currentIdx = -1;
     let alertTimeout;
     let waitInterval = null;
@@ -144,12 +140,10 @@
     }
 
     function showAlert(grade) {
-        if (grade === "배식 종료" || grade === "배식 전" || grade === "운영 안함") return;
+        if (grade === "배식 종료" || grade === "배식 전" || grade === "미운영") return;
         document.getElementById('alertGrade').innerText = grade;
         document.getElementById('alertOverlay').style.display = 'flex';
-        
         dingDong.play().catch(e => console.log("터치 전이라 소리 안남"));
-
         clearTimeout(alertTimeout);
         alertTimeout = setTimeout(closeAlert, 15000);
     }
@@ -159,7 +153,6 @@
         dingDong.pause(); dingDong.currentTime = 0;
     }
 
-    // ✨ 중요 팝업 제어
     function handlePopup(text) {
         const popup = document.getElementById('importantPopup');
         const textDiv = document.getElementById('importantPopupText');
@@ -175,10 +168,7 @@
         const waitBox = document.getElementById('waitTimeBox');
         if (waitInterval) clearInterval(waitInterval);
 
-        if (!waitMin || waitMin <= 0 || !setAtStr) {
-            waitBox.style.display = 'none';
-            return;
-        }
+        if (!waitMin || waitMin <= 0 || !setAtStr) { waitBox.style.display = 'none'; return; }
 
         const setAt = new Date(setAtStr);
         waitInterval = setInterval(() => {
@@ -187,12 +177,10 @@
             const remainingSec = (waitMin * 60) - diffSec;
 
             if (remainingSec <= 0) {
-                waitBox.style.display = 'none';
-                clearInterval(waitInterval);
+                waitBox.style.display = 'none'; clearInterval(waitInterval);
             } else {
                 waitBox.style.display = 'block';
-                const m = Math.floor(remainingSec / 60);
-                const s = remainingSec % 60;
+                const m = Math.floor(remainingSec / 60); const s = remainingSec % 60;
                 document.getElementById('displayTime').innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
             }
         }, 1000);
@@ -216,22 +204,31 @@
 
     function updateUI(index) {
         const statusBox = document.getElementById('studentQueue');
+        const subStatus = document.getElementById('subStatus');
         const banner = document.getElementById('noticeBanner');
         const targetGrade = document.getElementById('targetGrade');
         
         if (currentIdx !== -1 && currentIdx !== index && index > 0 && index < 4) { showAlert(grades[index]); }
         currentIdx = index;
         
-        if (index === 0 || index === 4 || index === 5) {
+        if (index === 5) {
             statusBox.innerText = grades[index];
-            statusBox.style.color = (index === 5) ? "#ef4444" : "#94a3b8"; // 운영 안함 시 빨간색
+            statusBox.style.color = "#ef4444"; 
+            subStatus.style.display = "block"; // 미운영 안내 문구 표시
             banner.style.display = "none";
         } else {
-            const currentGrade = grades[index];
-            statusBox.innerText = currentGrade;
-            statusBox.style.color = "#3b82f6";
-            banner.style.display = "block";
-            targetGrade.innerText = currentGrade;
+            subStatus.style.display = "none"; // 문구 숨김
+            if (index === 0 || index === 4) {
+                statusBox.innerText = grades[index];
+                statusBox.style.color = "#94a3b8";
+                banner.style.display = "none";
+            } else {
+                const currentGrade = grades[index];
+                statusBox.innerText = currentGrade;
+                statusBox.style.color = "#3b82f6";
+                banner.style.display = "block";
+                targetGrade.innerText = currentGrade;
+            }
         }
     }
 
