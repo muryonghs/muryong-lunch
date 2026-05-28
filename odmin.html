@@ -44,7 +44,7 @@
 
         <button class="btn-next" onclick="updateIdx('next')">다음 학년/상태 호출</button>
         <button class="btn-reset" onclick="updateIdx('reset')">순서 초기화 (배식 전으로)</button>
-        <button class="btn-reset" onclick="updateIdx('close')" style="color:#ef4444; border-color:#fecdd3; background:#fff1f2;">미운영</button>
+        <button class="btn-reset" onclick="updateIdx('close')" style="color:#ef4444; border-color:#fecdd3; background:#fff1f2;">🚫 미운영 설정</button>
 
         <hr style="border:0; border-top:1px dashed #cbd5e1; margin: 25px 0;">
         
@@ -69,7 +69,7 @@
     </div>
 
     <div class="card">
-        <span class="label" style="color:#e11d48;">중요 공지사항 팝업 (TV/학생 화면)</span>
+        <span class="label" style="color:#e11d48;">🚨 중요 공지사항 팝업 (TV/학생 화면)</span>
         <textarea id="popupInput" placeholder="긴급하게 알릴 내용을 적어주세요. (비우고 '내리기' 누르면 사라집니다)"></textarea>
         <div style="display:flex; gap:10px; margin-top:10px;">
             <button class="btn-reset" onclick="sendPopup('')" style="flex:1; color:#ef4444; border-color:#fecdd3; background:#fff1f2;">팝업 내리기</button>
@@ -78,7 +78,7 @@
     </div>
 
     <div class="card">
-        <span class="label">TV 현황판 설정</span>
+        <span class="label">📺 TV 현황판 설정</span>
         <div style="display:flex; justify-content:space-between; align-items:center; background:#f1f5f9; padding:15px 20px; border-radius:12px; border:1px solid #e2e8f0;">
             <span style="font-weight:700; color:#475569;">화면 글자 크기</span>
             <div style="display:flex; align-items:center; gap:15px;">
@@ -98,7 +98,7 @@
     <div class="card">
         <span class="label">최근 건의사항</span>
         <div id="fbList" class="feedback-list">건의사항이 없습니다.</div>
-        <button class="btn-clear" onclick="clearFeedback()">건의사항 전체 삭제</button>
+        <button class="btn-clear" onclick="clearFeedback()">🗑️ 건의사항 전체 삭제 (보안)</button>
     </div>
 </div>
 
@@ -116,24 +116,7 @@
     let tvScale = 100;
 
     async function init() {
-        const { data: s } = await supabaseClient.from('lunch_status').select('current_index, wait_minutes, wait_set_at').eq('id', 1).single();
-        if(s) { 
-            idx = s.current_index; 
-            updateColor(idx); 
-            updateWaitTimeUI(s.wait_minutes, s.wait_set_at);
-        }
-
-        const { data: nList } = await supabaseClient.from('announcements').select('*');
-        if(nList) {
-            nList.forEach(n => {
-                if(n.id === 1) document.getElementById('noticeInput').value = n.content;
-                if(n.id === 2) document.getElementById('popupInput').value = n.content;
-                if(n.id === 3) {
-                    tvScale = parseInt(n.content) || 100;
-                    document.getElementById('tvScaleDisplay').innerText = tvScale + '%';
-                }
-            });
-        }
+        await checkAndSyncData();
         loadExistingFeedback();
     }
 
@@ -183,7 +166,7 @@
     async function updateIdx(type) {
         if(type === 'next' && idx < 4) idx++; 
         else if(type === 'reset') { if(!confirm("순서를 초기화하시겠습니까?")) return; idx = 0; } 
-        else if (type === 'close') { if(!confirm("오늘 급식호출을 '미운영'으로 설정하시겠습니까?")) return; idx = 5; }
+        else if (type === 'close') { if(!confirm("오늘 급식을 '미운영'으로 설정하시겠습니까?")) return; idx = 5; }
 
         const { error } = await supabaseClient.from('lunch_status').update({ current_index: idx, wait_minutes: 0 }).eq('id', 1);
         if(!error) { updateColor(idx); resetWait(); }
@@ -221,6 +204,7 @@
     async function sendPopup(val) {
         const { error } = await supabaseClient.from('announcements').upsert({id: 2, content: val});
         if(!error) {
+            document.getElementById('popupInput').value = val;
             if(val === '') alert("팝업이 해제되었습니다.");
             else alert("학생과 TV 화면에 팝업이 띄워졌습니다!");
         }
@@ -231,7 +215,6 @@
         if(tvScale < 50) tvScale = 50;
         if(tvScale > 200) tvScale = 200;
         document.getElementById('tvScaleDisplay').innerText = tvScale + '%';
-
         const { error } = await supabaseClient.from('announcements').upsert({ id: 3, content: tvScale.toString() });
         if(error) alert("TV 설정 저장 실패: " + error.message);
     }
@@ -257,44 +240,46 @@
         }
     }
 
-    // ✨ 5초마다 조용하게 백그라운드 데이터 동기화 (입력창 방해 없음!)
-    setInterval(async () => {
+    // ✨ 서버 데이터 기준 동기화 및 12시 자동 튕김 오류 해결 함수
+    async function checkAndSyncData() {
         const now = new Date();
-        // 1. 낮 12시 리셋 체크
-        if (now.getHours() >= 12) {
-            const todayStr = now.toLocaleDateString('ko-KR');
-            const savedDate = localStorage.getItem('muryong_last_reset');
-            if (savedDate !== todayStr && idx !== 0 && idx !== 5) {
-                idx = 0;
+        const todayStr = now.toLocaleDateString('ko-KR');
+
+        const { data: nList } = await supabaseClient.from('announcements').select('*');
+        let globalLastReset = '';
+        if(nList) {
+            nList.forEach(n => {
+                if(n.id === 1) { if(document.activeElement !== document.getElementById('noticeInput')) document.getElementById('noticeInput').value = n.content; }
+                if(n.id === 2) { if(document.activeElement !== document.getElementById('popupInput')) document.getElementById('popupInput').value = n.content; }
+                if(n.id === 3) { tvScale = parseInt(n.content) || 100; document.getElementById('tvScaleDisplay').innerText = tvScale + '%'; }
+                if(n.id === 4) globalLastReset = n.content; // DB에 저장된 마지막 리셋 날짜
+            });
+        }
+
+        // 서버 DB(id=4)를 기준으로 하루 1번만 정확히 리셋
+        if (now.getHours() >= 12 && globalLastReset !== todayStr) {
+            await supabaseClient.from('announcements').upsert({ id: 4, content: todayStr });
+            const { data: currentStatus } = await supabaseClient.from('lunch_status').select('current_index').eq('id', 1).single();
+            if (currentStatus && currentStatus.current_index !== 0 && currentStatus.current_index !== 5) {
                 await supabaseClient.from('lunch_status').update({ current_index: 0, wait_minutes: 0 }).eq('id', 1);
-                localStorage.setItem('muryong_last_reset', todayStr);
-                updateColor(0); resetWait();
             }
         }
-        
-        // 2. 다른 데이터 동기화
+
         const { data: s } = await supabaseClient.from('lunch_status').select('current_index, wait_minutes, wait_set_at').eq('id', 1).single();
         if(s) {
-            if (idx !== s.current_index) {
-                idx = s.current_index;
-                updateColor(idx);
-            }
-            if (liveWaitMin !== s.wait_minutes || liveSetAt !== s.wait_set_at) {
-                updateWaitTimeUI(s.wait_minutes, s.wait_set_at);
-            }
+            if (idx !== s.current_index) { idx = s.current_index; updateColor(idx); }
+            if (liveWaitMin !== s.wait_minutes || liveSetAt !== s.wait_set_at) { updateWaitTimeUI(s.wait_minutes, s.wait_set_at); }
         }
-    }, 5000);
+    }
+
+    // 5초마다 백그라운드 데이터 검사 (새로고침 없이 조용하게)
+    setInterval(checkAndSyncData, 5000);
 
     supabaseClient.channel('fb-admin').on('postgres_changes', {event:'INSERT', schema:'public', table:'feedback'}, p => {
         const list = document.getElementById('fbList');
         if(list.innerText === "건의사항이 없습니다.") list.innerText = "";
         const div = document.createElement('div'); div.className='fb-item'; div.innerText = p.new.content;
         list.prepend(div);
-    }).subscribe();
-
-    supabaseClient.channel('status-admin').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lunch_status' }, p => {
-        updateColor(p.new.current_index);
-        updateWaitTimeUI(p.new.wait_minutes, p.new.wait_set_at);
     }).subscribe();
 
     init();
