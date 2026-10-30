@@ -22,7 +22,9 @@
         .main-content { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; flex-grow: 1; }
         .status-card { background: white; border-radius: 40px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 8px solid #3b82f6; padding: 40px; }
         .status-label { font-size: 4rem; color: #64748b; font-weight: 700; margin-bottom: 20px; }
-        .current-grade { font-size: 15rem; font-weight: 900; color: #1d4ed8; line-height: 1; text-align: center; word-break: keep-all; margin-bottom: 20px; }
+        
+        /* ✨ 1. 글자 크기 수정: 15rem -> 9rem */
+        .current-grade { font-size: 9rem; font-weight: 900; color: #1d4ed8; line-height: 1; text-align: center; word-break: keep-all; margin-bottom: 20px; }
 
         .wait-box { display: none; margin-top: 30px; background: #f8fafc; border-radius: 30px; padding: 25px 40px; text-align: center; border: 2px solid #e2e8f0; width: 100%; }
         .wait-time-text { font-size: 4.5rem; font-weight: 900; color: #2563eb; letter-spacing: -2px; margin-bottom: 5px; }
@@ -124,9 +126,7 @@
         hideTimer = setTimeout(() => { document.body.classList.add('hide-all'); }, 3000);
     }
 
-    // ✨ QR코드 팝업 함수 수정
     function showQrPopup() {
-        // 중요 팝업이 떠있거나 긴급 알림이 떠있으면 QR코드 안 띄움
         if (document.getElementById('alertOverlay').style.display === 'flex' || isPopupVisible) return;
         const qr = document.getElementById('qrPopup');
         qr.style.display = 'flex';
@@ -156,7 +156,6 @@
         setTimeout(() => { document.getElementById('alertOverlay').style.display = 'none'; }, 60000);
     }
 
-    // ✨ 5초마다 TV 팝업 보였다 숨겼다 하는 함수
     function togglePopupDisplay() {
         const popup = document.getElementById('importantPopup');
         if (document.getElementById('alertOverlay').style.display === 'flex') {
@@ -171,14 +170,13 @@
             setTimeout(() => { popup.style.display = 'none'; }, 500);
             isPopupVisible = false;
         } else {
-            document.getElementById('qrPopup').style.display = 'none'; // 팝업 뜰 때 QR 숨기기
+            document.getElementById('qrPopup').style.display = 'none'; 
             popup.style.display = 'flex';
             setTimeout(() => { popup.style.opacity = '1'; }, 10);
             isPopupVisible = true;
         }
     }
 
-    // ✨ 팝업 제어
     function handlePopup(text) {
         const textDiv = document.getElementById('importantPopupText');
         if (popupInterval) clearInterval(popupInterval);
@@ -186,8 +184,8 @@
         if (text && text.trim() !== '') {
             textDiv.innerText = text;
             isPopupVisible = false;
-            togglePopupDisplay(); // 1회 즉시 실행
-            popupInterval = setInterval(togglePopupDisplay, 5000); // 5초마다 교대
+            togglePopupDisplay(); 
+            popupInterval = setInterval(togglePopupDisplay, 5000); 
         } else {
             const popup = document.getElementById('importantPopup');
             popup.style.opacity = '0';
@@ -288,7 +286,33 @@
         }
     }).subscribe();
 
-    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleTimeString('ko-KR'); }, 1000);
+    // ✨ 2. 자동 전환 스케줄 기능 추가
+    const autoSchedule = [
+        { time: "12:30:00", index: 1 }, // 3학년 (grades[1])
+        { time: "12:40:00", index: 2 }, // 2학년 (grades[2])
+        { time: "12:50:00", index: 3 }, // 1학년 (grades[3])
+        { time: "13:30:00", index: 4 }  // 배식 종료 (grades[4])
+    ];
+
+    function checkAutoSchedule() {
+        const now = new Date();
+        const currentTimeString = now.toTimeString().split(' ')[0]; // "12:30:00" 포맷
+
+        const match = autoSchedule.find(s => s.time === currentTimeString);
+        if (match) {
+            supabaseClient.from('lunch_status')
+                .update({ current_index: match.index })
+                .eq('id', 1)
+                .then(() => console.log(`자동 전환: ${match.time} -> 인덱스 ${match.index}`))
+                .catch(err => console.error("자동 전환 오류:", err));
+        }
+    }
+
+    setInterval(() => { 
+        document.getElementById('clock').innerText = new Date().toLocaleTimeString('ko-KR'); 
+        checkAutoSchedule();
+    }, 1000);
+
     init();
     resetTimer();
 </script>
