@@ -23,7 +23,6 @@
         .status-card { background: white; border-radius: 40px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 8px solid #3b82f6; padding: 40px; }
         .status-label { font-size: 4rem; color: #64748b; font-weight: 700; margin-bottom: 20px; }
         
-        /* ✨ 1. 글자 크기 수정: 15rem -> 9rem */
         .current-grade { font-size: 9rem; font-weight: 900; color: #1d4ed8; line-height: 1; text-align: center; word-break: keep-all; margin-bottom: 20px; }
 
         .wait-box { display: none; margin-top: 30px; background: #f8fafc; border-radius: 30px; padding: 25px 40px; text-align: center; border: 2px solid #e2e8f0; width: 100%; }
@@ -41,13 +40,7 @@
         .alert-msg { font-size: 11rem; font-weight: 900; animation: bounce 0.6s infinite alternate; }
         @keyframes bounce { from { transform: scale(1); } to { transform: scale(1.1); } }
 
-        /* ✨ 5초마다 나타났다 사라질 TV 팝업 */
-        #importantPopup { 
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(15, 23, 42, 0.95); z-index: 10000; justify-content: center; align-items: center; flex-direction: column; 
-            padding: 50px; box-sizing: border-box; backdrop-filter: blur(10px); 
-            opacity: 0; transition: opacity 0.5s ease-in-out;
-        }
+        #importantPopup { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.95); z-index: 10000; justify-content: center; align-items: center; flex-direction: column; padding: 50px; box-sizing: border-box; backdrop-filter: blur(10px); opacity: 0; transition: opacity 0.5s ease-in-out; }
         .important-content { background: white; padding: 80px; border-radius: 40px; text-align: center; box-shadow: 0 30px 60px rgba(0,0,0,0.5); border: 10px solid #e11d48; max-width: 90%; }
         .important-content h2 { margin: 0 0 40px 0; color: #e11d48; font-size: 6rem; font-weight: 900; }
         #importantPopupText { font-size: 4rem; line-height: 1.6; color: #1e293b; font-weight: 800; white-space: pre-wrap; word-break: keep-all; }
@@ -286,31 +279,44 @@
         }
     }).subscribe();
 
-    // ✨ 2. 자동 전환 스케줄 기능 추가
+    // ✨ 개선된 자동 전환 로직
     const autoSchedule = [
-        { time: "12:30:00", index: 1 }, // 3학년 (grades[1])
-        { time: "12:40:00", index: 2 }, // 2학년 (grades[2])
-        { time: "12:50:00", index: 3 }, // 1학년 (grades[3])
-        { time: "13:30:00", index: 4 }  // 배식 종료 (grades[4])
+        { h: 12, m: 30, index: 1 }, // 12시 30분: 3학년
+        { h: 12, m: 40, index: 2 }, // 12시 40분: 2학년
+        { h: 12, m: 50, index: 3 }, // 12시 50분: 1학년
+        { h: 13, m: 0,  index: 4 }  // 1시 00분: 배식 종료
     ];
+
+    let lastTriggeredMinute = -1; // 중복 실행 방지용 변수
 
     function checkAutoSchedule() {
         const now = new Date();
-        const currentTimeString = now.toTimeString().split(' ')[0]; // "12:30:00" 포맷
+        const h = now.getHours();
+        const m = now.getMinutes();
+        const s = now.getSeconds();
 
-        const match = autoSchedule.find(s => s.time === currentTimeString);
-        if (match) {
-            supabaseClient.from('lunch_status')
-                .update({ current_index: match.index })
-                .eq('id', 1)
-                .then(() => console.log(`자동 전환: ${match.time} -> 인덱스 ${match.index}`))
-                .catch(err => console.error("자동 전환 오류:", err));
+        // 매 분 정각(0초~2초 사이)에 스케줄을 확인하여 누락 없이 안정적으로 실행
+        if (s >= 0 && s <= 2 && lastTriggeredMinute !== m) {
+            const match = autoSchedule.find(sch => sch.h === h && sch.m === m);
+            if (match) {
+                lastTriggeredMinute = m; // 한 번 실행된 분(minute)은 저장해서 중복 실행 방지
+                
+                // 1. 화면 즉시 업데이트
+                updateTVUI(match.index);
+
+                // 2. DB 업데이트 (TV 권한 문제로 실패하더라도 화면은 이미 바뀌어 있음)
+                supabaseClient.from('lunch_status')
+                    .update({ current_index: match.index })
+                    .eq('id', 1)
+                    .then(() => console.log(`자동 전환 완료: ${h}시 ${m}분 (인덱스 ${match.index})`))
+                    .catch(err => console.error("자동 전환 DB 업데이트 오류:", err));
+            }
         }
     }
 
     setInterval(() => { 
         document.getElementById('clock').innerText = new Date().toLocaleTimeString('ko-KR'); 
-        checkAutoSchedule();
+        checkAutoSchedule(); // 1초마다 자동 스케줄 점검
     }, 1000);
 
     init();
